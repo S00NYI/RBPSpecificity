@@ -44,26 +44,6 @@ returnMS <- function(motif_enrichment, motif = NULL, output_type = "matrix", sen
 }
 
 
-#' Generate Single Nucleotide Variants for a Motif
-#'
-#' @description Internal helper to create all possible single nucleotide variants.
-#'
-#' @param motif Character string, the reference motif.
-#' @param nucleotides Character vector of possible nucleotides (e.g., c('A', 'C', 'G', 'T')).
-#'
-#' @return A character vector of all unique SNV motifs.
-#' @keywords internal
-genMotifVar <- function(motif, nucleotides = c('A', 'C', 'G', 'T')) {
-  # (Based on original Motif_Variants logic)
-  # 1. Loop through positions in motif
-  # 2. Loop through nucleotides
-  # 3. Create variant if nucleotide differs from original at that position
-  # 4. Collect unique variants
-  # 5. Return vector of variants
-  {}
-}
-
-
 #' Calculate Sensitivity Score for SNVs
 #'
 #' @description Internal helper to calculate sensitivity based on reference

@@ -1,25 +1,124 @@
 # Utility and helper functions used across multiple modules
 
-#' Parse Peak Input Data
+#' Min-Max Normalization
 #'
-#' @description Validates and converts various peak input formats (data frame,
-#' file path) into a standardized GRanges object.
+#' @description Internal helper to scale a numeric vector to a specified range.
+#'   Handles cases where min and max are equal.
 #'
-#' @param input Can be a data frame (with chr, start, end columns), a file path
-#'   (e.g., to a BED file), or potentially already a GRanges object.
+#' @param x Numeric vector.
+#' @param a Numeric, the minimum value of the target range (default: 0).
+#' @param b Numeric, the maximum value of the target range (default: 1).
 #'
-#' @return A GRanges object representing the peaks.
-#' @importFrom data.table fread
-#' @importFrom GenomicRanges GRanges makeGRangesFromDataFrame
+#' @return Numeric vector scaled to the range [a, b]. NA values in input
+#'   will result in NA values in output.
+#' @keywords internal
+minmaxNorm <- function(x, a = 0, b = 1) {
+  # (Based on original min_max_norm logic)
+  # Handle NA values appropriately (e.g., using na.rm = TRUE)
+  # Handle cases where max(x) == min(x) to avoid division by zero
+  {}
+}
+
+
+#' Scramble DNA Sequence
+#'
+#' @description Randomly shuffles nucleotides within a sequence. Input can be
+#'   character string or DNAString. Output is always DNAString.
+#'
+#' @param seq A DNAString or character string representing a sequence.
+#'
+#' @return A DNAString object with shuffled nucleotides. Returns empty DNAString
+#'   if input is empty or NA.
+#' @importFrom Biostrings DNAString BString subject
 #' @importFrom methods is
 #' @keywords internal
-peakParse <- function(input) {
-  # 1. Check class of input (data.frame, character path, GRanges)
-  # 2. If path, read file (e.g., using data.table::fread for BED)
-  # 3. If data.frame or read data, validate required columns (chr, start, end, optionally strand)
-  # 4. Convert data frame to GRanges (handle potential different column names)
-  # 5. If already GRanges, validate it minimally
-  # 6. Return validated GRanges object
+scrambleDNA <- function(seq) {
+  # (Based on original ScrambleDNA logic)
+  # 1. Convert input to character if necessary
+  # 2. Split into individual nucleotides
+  # 3. Sample (shuffle) the nucleotides
+  # 4. Paste back together
+  # 5. Convert back to DNAString
+  # 6. Return DNAString
+  {}
+}
+
+
+#' Generate Random Genomic Distances
+#'
+#' @description Generates random distances, ensuring a minimum separation from zero.
+#' Used for shifting background regions. Uses runif for sampling.
+#'
+#' @param N Integer, the number of distances to generate. Must be positive.
+#' @param X Integer, the minimum absolute distance from zero. Must be non-negative.
+#' @param max_dist Integer, the maximum absolute distance for sampling (default: 1000).
+#'
+#' @return A numeric vector of N random distances.
+#' @importFrom stats runif
+#' @keywords internal
+genRNDist <- function(N, X) {
+  # (Based on original generate_random_distances logic)
+  # 1. Generate N/2 negative distances (runif -1000 to -X)
+  # 2. Generate N/2 positive distances (runif X to 1000) - adjust range if needed
+  # 3. Combine and shuffle
+  # 4. Return vector
+  {}
+}
+
+
+#' Generate Single Nucleotide Variants for a Motif
+#'
+#' @description Internal helper to create all possible single nucleotide variants.
+#'
+#' @param motif Character string, the reference motif.
+#' @param nucleotides Character vector of possible nucleotides (e.g., c('A', 'C', 'G', 'T')).
+#'
+#' @return A character vector of all unique SNV motifs (excluding the original motif).
+#' @keywords internal
+genMotifVar <- function(motif, nucleotides = c('A', 'C', 'G', 'T')) {
+  # (Based on original Motif_Variants logic)
+  # 1. Loop through positions in motif
+  # 2. Loop through nucleotides
+  # 3. Create variant if nucleotide differs from original at that position
+  # 4. Collect unique variants
+  # 5. Return vector of variants
+  {}
+}
+
+
+#' Find Top Motif by Score
+#'
+#' @description Identifies the motif with the highest score in an enrichment data frame.
+#'   Handles ties by returning the first one encountered.
+#'
+#' @param motif_enrichment Data frame with 'MOTIF' and 'Score' (or 'Enrichment') columns.
+#'                         Assumes higher scores are better.
+#'
+#' @return Character string, the top-scoring motif.
+#' @keywords internal
+findTopMotif <- function(motif_enrichment) {
+  # 1. Find index of max score (handle ties if necessary, e.g., take first)
+  # 2. Return the MOTIF at that index
+  {}
+}
+
+
+#' Validate Motif Input
+#'
+#' @description Checks if a user-provided motif is valid (correct length, exists
+#'   within a provided set of available motifs). Stops execution if invalid.
+#'
+#' @param motif Character string, the motif to validate.
+#' @param kmer_size Integer, the expected K-mer length.
+#' @param available_motifs Character vector of all motifs present in the data.
+#'
+#' @return Returns `TRUE` invisibly if valid, otherwise stops with an error.
+#' @keywords internal
+valInputMotif <- function(motif, kmer_size, available_motifs) {
+  # 1. Check if nchar(motif) == kmer_size
+  # 2. Check if motif %in% available_motifs
+  # 3. If checks fail, stop() with an informative error message
+  # 4. Return TRUE if all checks pass
   {}
 }
 
@@ -30,15 +129,44 @@ peakParse <- function(input) {
 #' build identifier. Checks if the package is installed.
 #'
 #' @param species_or_build Character string (e.g., "hg38", "human", "mm10", "mouse").
+#'   Currently supports hg19, hg38, mm9, mm10.
 #'
 #' @return A BSgenome object.
-#' @importFrom BSgenome getBSgenome installed.genomes
+#' @importFrom BSgenome getBSgenome
+#' @importFrom methods is
 #' @keywords internal
 selectGenome <- function(species_or_build) {
   # 1. Map common names (e.g., "human") to package names (e.g., "BSgenome.Hsapiens.UCSC.hg38")
   # 2. Check if the required BSgenome package is installed using installed.genomes() or requireNamespace()
   # 3. If not installed, stop with an informative error message asking the user to install it.
   # 4. If installed, load and return the genome object using BSgenome::getBSgenome()
+  {}
+}
+
+
+#' Parse Peak Input Data
+#'
+#' @description Validates and converts peak input (currently data frame or GRanges)
+#' into a standardized GRanges object. Basic column checking included.
+#'
+#' @param input Can be a data frame (with chr, start, end columns), or a GRanges object.
+#'   File path input is not yet supported by this helper.
+#' @param required_cols Character vector of essential column names expected if input is a data frame
+#'   (default: c("chr", "start", "end")). Common alternatives like "seqnames" are handled.
+#' @param keep_extra Logical, if TRUE, keep additional metadata columns when converting
+#'   data frame to GRanges (default: TRUE).
+#'
+#' @return A GRanges object representing the peaks.
+#' @importFrom GenomicRanges GRanges makeGRangesFromDataFrame seqnames start end strand
+#' @importFrom methods is
+#' @keywords internal
+peakParse <- function(input) {
+  # 1. Check class of input (data.frame, character path, GRanges)
+  # 2. If path, read file (e.g., using data.table::fread for BED)
+  # 3. If data.frame or read data, validate required columns (chr, start, end, optionally strand)
+  # 4. Convert data frame to GRanges (handle potential different column names)
+  # 5. If already GRanges, validate it minimally
+  # 6. Return validated GRanges object
   {}
 }
 
@@ -83,98 +211,5 @@ countKmers <- function(sequences, K, nucleotides = c("A", "C", "G", "T")) {
   {}
 }
 
-
-#' Generate Random Genomic Distances
-#'
-#' @description Generates random distances, ensuring a minimum separation from zero.
-#' Used for shifting background regions.
-#'
-#' @param N Integer, the number of distances to generate.
-#' @param X Integer, the minimum absolute distance from zero.
-#'
-#' @return A numeric vector of N random distances.
-#' @importFrom stats runif
-#' @keywords internal
-genRNDist <- function(N, X) {
-  # (Based on original generate_random_distances logic)
-  # 1. Generate N/2 negative distances (runif -1000 to -X)
-  # 2. Generate N/2 positive distances (runif X to 1000) - adjust range if needed
-  # 3. Combine and shuffle
-  # 4. Return vector
-  {}
-}
-
-
-#' Scramble DNA Sequence
-#'
-#' @description Randomly shuffles nucleotides within a sequence.
-#'
-#' @param seq A DNAString or character string representing a sequence.
-#'
-#' @return A DNAString object with shuffled nucleotides.
-#' @importFrom Biostrings DNAString
-#' @keywords internal
-scrambleDNA <- function(seq) {
-  # (Based on original ScrambleDNA logic)
-  # 1. Convert input to character if necessary
-  # 2. Split into individual nucleotides
-  # 3. Sample (shuffle) the nucleotides
-  # 4. Paste back together
-  # 5. Convert back to DNAString
-  # 6. Return DNAString
-  {}
-}
-
-
-#' Find Top Motif by Score
-#'
-#' @description Identifies the motif with the highest score in an enrichment data frame.
-#'
-#' @param motif_enrichment Data frame with 'MOTIF' and 'Score' columns.
-#'
-#' @return Character string, the top-scoring motif.
-#' @keywords internal
-findTopMotif <- function(motif_enrichment) {
-  # 1. Find index of max score (handle ties if necessary, e.g., take first)
-  # 2. Return the MOTIF at that index
-  {}
-}
-
-
-#' Validate Motif Input
-#'
-#' @description Checks if a user-provided motif is valid (correct length, exists).
-#'
-#' @param motif Character string, the motif to validate.
-#' @param kmer_size Integer, the expected K-mer length.
-#' @param available_motifs Character vector of all motifs present in the data.
-#'
-#' @return TRUE if valid, otherwise stops with an error.
-#' @keywords internal
-valInputMotif <- function(motif, kmer_size, available_motifs) {
-  # 1. Check if nchar(motif) == kmer_size
-  # 2. Check if motif %in% available_motifs
-  # 3. If checks fail, stop() with an informative error message
-  # 4. Return TRUE if all checks pass
-  {}
-}
-
-
-#' Min-Max Normalization
-#'
-#' @description Internal helper to scale a numeric vector to a specified range.
-#'
-#' @param x Numeric vector.
-#' @param a Numeric, the minimum value of the target range (default: 0).
-#' @param b Numeric, the maximum value of the target range (default: 1).
-#'
-#' @return Numeric vector scaled to the range [a, b].
-#' @keywords internal
-minmaxNorm <- function(x, a = 0, b = 1) {
-  # (Based on original min_max_norm logic)
-  # Handle NA values appropriately (e.g., using na.rm = TRUE)
-  # Handle cases where max(x) == min(x) to avoid division by zero
-  {}
-}
 
 #-------------------------------------------------------------------------------

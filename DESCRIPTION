@@ -2,8 +2,6 @@ Package: RBPSpecificity
 Type: Package
 Title: RBP Inherent Specificity and Mutational Sensitivity Analysis Tool
 Version: 0.1.0
-Author: Soon Yi
-Maintainer: cu.soonyi@gmail.com
 Description:
     Provides tools to analyze RNA Binding Protein (RBP) binding characteristics
     from high-throughput sequencing data. Capabilities include calculating
@@ -11,11 +9,20 @@ Description:
     Sensitivity (MS) profiles, along with visualization methods.
     For detailed methodology and applications, please refer to our manuscript
     (see URL field or vignette).
-License: MIT
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 URL:
     https://www.biorxiv.org/content/10.1101/2025.03.28.646018v2,
     https://github.com/S00NYI/Spec_Analysis,
     https://github.com/S00NYI/Specificity_BITs
+Authors@R: 
+    person("Soon", "Yi", , "cu.soonyi@gmail.com", role = c("aut", "cre"))
 RoxygenNote: 7.3.2
+Imports: 
+    Biostrings,
+    BSgenome,
+    GenomicRanges,
+    ggplot2,
+    methods,
+    reshape2

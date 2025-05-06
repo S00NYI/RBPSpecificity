@@ -17,17 +17,15 @@
 #' @section Key Functions:
 #' The main workflow of the package revolves around the following exported functions:
 #' \itemize{
-#'   \item \code{\link{motifEnrichment}}: Calculates K-mer enrichment from peak data (e.g., BED files or GRanges representing eCLIP peaks), with options for background correction.
-#'   \item \code{\link{returnIS}}: Determines the Inherent Specificity (IS) score for a given motif based on its enrichment relative to other motifs.
-#'   \item \code{\link{plotIS}}: Visualizes the distribution of motif enrichment scores and annotates the IS for a selected motif.
-#'   \item \code{\link{returnMS}}: Quantifies the Mutational Sensitivity (MS) of a motif to all possible single nucleotide variations, providing results as a matrix or a single average score.
-#'   \item \code{\link{plotMS}}: Generates plots to visualize Mutational Sensitivity profiles, highlighting the impact of nucleotide changes at each position within a motif.
+#'   \item \code{\link{motifEnrichment}}: Calculates K-mer enrichment from peak data...
+#'   \item \code{\link{returnIS}}: Quantifies the Inherent Specificity (IS) of RBP...
+#'   \item \code{\link{plotIS}}: Visualizes the distribution of motif enrichment scores with annotation...
+#'   \item \code{\link{returnMS}}: Quantifies the Mutational Sensitivity (MS) of RBP...
+#'   \item \code{\link{plotMS}}: Generates plots to visualize Mutational Sensitivity
 #' }
 #'
-#' @docType package
-#' @name RBPSpecificity-package
-#' @aliases RBPSpecificity
 #' @author Soon Yi \email{cu.soonyi@gmail.com}
+#' @aliases RBPSpecificity RBPSpecificity-package # Ensures ?RBPSpecificity and ?RBPSpecificity-package work
 #'
 #' @seealso
 #' Useful links:
@@ -35,10 +33,7 @@
 #'   \item \url{https://github.com/S00NYI/RBPSpecificity} (Development repository)
 #'   \item Report bugs at \url{https://github.com/S00NYI/RBPSpecificity/issues}
 #' }
-NULL # This NULL is important; it signifies the end of the roxygen block's association.
-
-#' @keywords internal
-"_PACKAGE"
+"_PACKAGE" # Document this special string directly
 
 ## usethis namespace: start
 ## usethis namespace: end

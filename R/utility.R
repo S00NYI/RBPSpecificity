@@ -385,19 +385,171 @@ peakParse <- function(input, required_cols = c("chr", "start", "end"), keep_extr
 
 #' Get Sequences from GRanges
 #'
-#' @description Extracts DNA sequences for a set of genomic ranges from a BSgenome object.
+#' @description Extracts DNA sequences for a set of genomic ranges from a
+#'   BSgenome object. Optionally extends ranges from their 5'-end, filters by
+#'   minimum length, and ensures ranges are valid within chromosome boundaries.
+#'   Original metadata columns (`mcols`) and names from the input `granges_obj`
+#'   are preserved for the ranges that successfully yield sequences.
 #'
 #' @param granges_obj A GRanges object.
 #' @param genome_obj A BSgenome object.
+#' @param extension Integer, number of base pairs to extend each range from its
+#'   5'-end (upstream). Positive values extend, negative values shorten from
+#'   the 5'-end, keeping the 3'-end fixed. Default: 0 (no change).
+#' @param resize_fix Character string, determines which part of the original range
+#'   is anchored when applying the `extension`. For 5'-end extension, "end"
+#'   (default) anchors the 3'-end of the original range. "start" would anchor
+#'   the 5'-end (extending the 3'-end), and "center" expands/contracts from
+#'   the center. This is passed to `GenomicRanges::resize()`.
+#' @param min_length Integer, the minimum acceptable length of a range after
+#'   any resizing. Ranges shorter than this will be removed. Default: 1.
 #'
-#' @return A DNAStringSet object containing the sequences.
+#' @return A DNAStringSet object containing the extracted sequences. Names of the
+#'   sequences in the set will correspond to the names of the processed GRanges
+#'   object (if names were present on the input and preserved). Original metadata
+#'   columns are preserved on the intermediate GRanges object used for sequence
+#'   extraction. Returns an empty DNAStringSet if input `granges_obj` is empty
+#'   or if all ranges are filtered out.
 #' @importFrom Biostrings getSeq DNAStringSet
-#' @importFrom GenomicRanges GRanges
+#' @importFrom GenomicRanges GRanges resize width strand seqnames seqlengths trim
+#' @importFrom GenomeInfoDb seqlengths<- seqlevels seqlevelsInUse keepSeqlevels
+#' @importFrom S4Vectors mcols mcols<-
+#' @importFrom methods is
 #' @keywords internal
-getSequence <- function(granges_obj, genome_obj) {
-  # 1. Use Biostrings::getSeq(genome_obj, granges_obj)
-  # 2. Return DNAStringSet
-  {}
+getSequence <- function(granges_obj, genome_obj, extension = 0, resize_fix = "end", min_length = 1) {
+  # Input Validations
+  if (!methods::is(granges_obj, "GRanges")) {
+    stop("'granges_obj' must be a GRanges object.")
+  }
+  if (!methods::is(genome_obj, "BSgenome")) {
+    stop("'genome_obj' must be a BSgenome object.")
+  }
+  if (!is.numeric(extension) || length(extension) != 1) {
+    stop("'extension' must be a single numeric value (integer preferred).")
+  }
+  extension <- as.integer(extension) # Ensure it's integer
+
+  if (!is.character(resize_fix) || length(resize_fix) != 1 ||
+      !resize_fix %in% c("start", "end", "center")) {
+    stop("'resize_fix' must be one of 'start', 'end', or 'center'.")
+  }
+  if (!is.numeric(min_length) || length(min_length) != 1 || min_length < 1 || min_length %% 1 != 0) {
+    stop("'min_length' must be a single positive integer.")
+  }
+
+  # Handle empty granges_obj
+  if (length(granges_obj) == 0) {
+    return(Biostrings::DNAStringSet())
+  }
+
+  # Store original metadata and add an index for robust re-attachment
+  original_mcols <- S4Vectors::mcols(granges_obj)
+  original_names <- names(granges_obj)
+  granges_obj$..original_index.. <- seq_along(granges_obj) # Temporary index column
+
+  # Apply extension by calculating target widths
+  # The width argument to resize is the *target* final width.
+  target_widths <- GenomicRanges::width(granges_obj) + extension
+
+  # Filter ranges that would become non-positive in width *before* resizing.
+  # GenomicRanges::resize() errors on non-positive target widths.
+  valid_for_resize_idx <- target_widths >= 1
+
+  if (any(!valid_for_resize_idx)) {
+    num_invalid_resize <- sum(!valid_for_resize_idx)
+    message(num_invalid_resize, " ranges would result in non-positive widths due to 'extension' ",
+            "value and will be removed before resizing.")
+    granges_obj <- granges_obj[valid_for_resize_idx]
+    target_widths <- target_widths[valid_for_resize_idx]
+  }
+
+  if (length(granges_obj) == 0) {
+    message("No ranges remaining after filtering for non-positive target widths.")
+    return(Biostrings::DNAStringSet())
+  }
+
+  # Perform resizing
+  current_gr <- granges_obj # Start with the (potentially filtered) granges_obj
+  if (extension != 0) {
+    # Suppress warnings from resize if target_widths are valid (>=1)
+    current_gr <- suppressWarnings(
+      GenomicRanges::resize(current_gr, width = target_widths, fix = resize_fix, ignore.strand = FALSE)
+    )
+  }
+
+  # Filter by min_length
+  widths_after_resize_or_original <- GenomicRanges::width(current_gr)
+  keep_idx_min_length <- widths_after_resize_or_original >= min_length
+
+  if (any(!keep_idx_min_length)) {
+    num_removed_min_length <- sum(!keep_idx_min_length)
+    message(num_removed_min_length, " ranges removed because their final length was less than min_length (", min_length, ").")
+    current_gr <- current_gr[keep_idx_min_length]
+  }
+
+  if (length(current_gr) == 0) {
+    message("No ranges remaining after filtering by 'min_length'.")
+    return(Biostrings::DNAStringSet())
+  }
+
+  # Filter for valid seqlevels & trim to chromosome boundaries
+  valid_seqlevels <- intersect(GenomeInfoDb::seqlevels(current_gr), GenomeInfoDb::seqlevels(genome_obj))
+
+  if (length(valid_seqlevels) < length(GenomeInfoDb::seqlevelsInUse(current_gr))) {
+    original_gr_count_sl <- length(current_gr)
+    current_gr <- GenomeInfoDb::keepSeqlevels(current_gr, valid_seqlevels, pruning.mode="tidy")
+    num_removed_sl <- original_gr_count_sl - length(current_gr)
+    if (num_removed_sl > 0) {
+      message(num_removed_sl, " ranges removed due to seqlevels not present in the genome object.")
+    }
+  }
+
+  if (length(current_gr) == 0) {
+    message("No ranges remaining after filtering for seqlevels present in genome object.")
+    return(Biostrings::DNAStringSet())
+  }
+
+  genome_seqlengths_subset <- GenomeInfoDb::seqlengths(genome_obj)[GenomeInfoDb::seqlevels(current_gr)]
+  # Handle cases where a seqlevel in current_gr might not have a length in genome_seqlengths_subset
+  # (should not happen if keepSeqlevels and intersect worked correctly, but as a safeguard)
+  genome_seqlengths_subset <- genome_seqlengths_subset[!is.na(genome_seqlengths_subset)]
+  # Only assign for common levels
+  common_levels_for_seqlengths <- intersect(names(genome_seqlengths_subset), GenomeInfoDb::seqlevels(current_gr))
+  GenomeInfoDb::seqlengths(current_gr)[common_levels_for_seqlengths] <- genome_seqlengths_subset[common_levels_for_seqlengths]
+
+  trimmed_gr <- GenomicRanges::trim(current_gr)
+
+  if (length(trimmed_gr) == 0) {
+    message("No valid ranges remaining after trimming to chromosome boundaries.")
+    return(Biostrings::DNAStringSet())
+  }
+
+  # Metadata re-attachment using original index
+  final_original_indices <- trimmed_gr$..original_index..
+
+  if (!is.null(final_original_indices)) {
+    if (!is.null(original_mcols) && ncol(original_mcols) > 0) {
+      S4Vectors::mcols(trimmed_gr) <- original_mcols[final_original_indices, , drop = FALSE]
+    } else {
+      S4Vectors::mcols(trimmed_gr) <- NULL
+    }
+    if (!is.null(original_names)) {
+      names(trimmed_gr) <- original_names[final_original_indices]
+    } else {
+      names(trimmed_gr) <- NULL
+    }
+    trimmed_gr$..original_index.. <- NULL # Remove temporary index column
+  } else if (length(trimmed_gr) > 0) {
+    warning("Could not re-attach original metadata due to missing internal index. Metadata might be lost.")
+    S4Vectors::mcols(trimmed_gr) <- NULL # Clear mcols for safety
+    names(trimmed_gr) <- NULL # Clear names for safety
+  }
+
+  # Get sequences
+  sequences <- Biostrings::getSeq(genome_obj, trimmed_gr)
+  # Names of sequences will be inherited from names(trimmed_gr)
+
+  return(sequences)
 }
 
 

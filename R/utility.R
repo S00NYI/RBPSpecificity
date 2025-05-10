@@ -555,24 +555,100 @@ getSequence <- function(granges_obj, genome_obj, extension = 0, resize_fix = "en
 
 #' Count K-mers in Sequences
 #'
-#' @description Counts occurrences of all possible K-mers within a DNAStringSet.
+#' @description Counts occurrences of all possible K-mers of a given length
+#'   within a DNAStringSet. This function is case-sensitive for motifs once
+#'   generated (all K-mers are generated in uppercase).
 #'
-#' @param sequences A DNAStringSet object.
-#' @param K Integer, the K-mer size.
-#' @param nucleotides Character vector of nucleotides (default: DNA).
+#' @param sequences A DNAStringSet object, typically the output from
+#'   \code{\link{getSequence}}.
+#' @param K Integer, the K-mer size (length of motifs). Must be a single
+#'   positive integer.
+#' @param type Character string specifying the nucleic acid type for K-mer
+#'   generation. Accepted values are "DNA" (using A,C,G,T) or "RNA"
+#'   (using A,C,G,U). The input is case-insensitive. Default: "DNA".
 #'
-#' @return A data frame with 'MOTIF' and 'COUNT' columns.
-#' @importFrom Biostrings DNAStringSet PDict vcountPDict oligonucleotideFrequency
+#' @return A data frame with two columns: 'MOTIF' (character, all possible
+#'   K-mers in uppercase) and 'COUNT' (integer). 'COUNT' is the total
+#'   count of each K-mer across all input sequences. Returns a data frame
+#'   with all possible K-mers and 0 counts if input sequences are empty or
+#'   if all sequences are shorter than K.
+#'
+#' @importFrom Biostrings DNAStringSet PDict vcountPDict
+#' @importFrom S4Vectors elementNROWS # To get lengths of individual sequences in DNAStringSet
+#' @importFrom methods is
 #' @keywords internal
-countKmers <- function(sequences, K, nucleotides = c("A", "C", "G", "T")) {
-  # 1. Generate all possible K-mer strings
-  # 2. Create a PDict object from the K-mer strings
-  # 3. Use Biostrings::vcountPDict(pdict, sequences, collapse=1) to count
-  # 4. Alternatively, use Biostrings::oligonucleotideFrequency(sequences, K, step=1, as.prob=FALSE)
-  #    and sum across sequences if needed. vcountPDict is usually better here.
-  # 5. Format results into a data frame ('MOTIF', 'COUNT')
-  # 6. Return data frame
-  {}
+#'
+#' @examples
+#' \dontrun{
+#'   # Assuming 'seqs' is a DNAStringSet object and 'getSequence' is available
+#'   # library(Biostrings)
+#'   # seqs_dna <- DNAStringSet(c("ATGCGATGC", "GGCCTTAA", "TTT"))
+#'   # countKmers(seqs_dna, K = 3, type = "DNA")
+#'
+#'   # seqs_rna <- DNAStringSet(c("AUGCGAUGC", "GGCCUUAA", "UUU"))
+#'   # countKmers(seqs_rna, K = 3, type = "RNA")
+#'
+#'   # Empty input
+#'   # countKmers(DNAStringSet(), K = 3)
+#'
+#'   # Sequences shorter than K
+#'   # countKmers(DNAStringSet(c("A", "CG")), K = 3)
+#' }
+countKmers <- function(sequences, K, type = "DNA") {
+  # Input Validation for 'sequences'
+  if (!methods::is(sequences, "DNAStringSet")) {
+    stop("'sequences' must be a DNAStringSet object.")
+  }
+
+  # Input Validation for 'K'
+  if (!is.numeric(K) || length(K) != 1 || K <= 0 || K %% 1 != 0) {
+    stop("'K' must be a single positive integer.")
+  }
+  if (K > 12) { # Practical warning for very large K that might create huge combinations
+    warning("'K' is ", K, ", generating all K-mer combinations can be memory/time intensive.")
+  }
+
+  # Input Validation and setup for 'type'
+  if (!is.character(type) || length(type) != 1) {
+    stop("'type' must be a single character string ('DNA' or 'RNA').")
+  }
+  type_upper <- toupper(type)
+  selected_nucleotides <- switch(type_upper,
+                                 "DNA" = c('A', 'C', 'G', 'T'),
+                                 "RNA" = c('A', 'C', 'G', 'U'),
+                                 stop("Invalid 'type': must be 'DNA' or 'RNA'. Received: '", type, "'")
+  )
+
+  # Generate all possible K-mers based on the selected alphabet and K
+  # This list will be in uppercase.
+  kmer_grid <- base::expand.grid(replicate(K, selected_nucleotides, simplify = FALSE))
+  all_kmers_vector <- do.call(paste0, kmer_grid)
+
+  # Handle edge case: empty sequences or all sequences shorter than K
+  # S4Vectors::elementNROWS gets individual sequence lengths in a DNAStringSet
+  if (length(sequences) == 0 || all(S4Vectors::elementNROWS(sequences) < K)) {
+    message("Input 'sequences' is empty or all sequences are shorter than K (", K, "). ",
+            "Returning all possible K-mers with counts of 0.")
+    return(data.frame(MOTIF = all_kmers_vector, COUNT = 0L, stringsAsFactors = FALSE))
+  }
+
+  # Create PDict (Pattern Dictionary) from the character vector of all K-mers
+  # The patterns in PDict will be treated as case-sensitive by default by vcountPDict,
+  # so if input 'sequences' are not uppercase, they might not match.
+  # However, DNAStringSet objects usually store sequences in uppercase.
+  kmer_pdict <- Biostrings::PDict(all_kmers_vector)
+
+  # Count K-mers
+  # collapse = TRUE sums counts over all sequences in the DNAStringSet
+  kmer_counts <- Biostrings::vcountPDict(kmer_pdict, sequences, collapse = TRUE)
+
+  # Create and return results data frame
+  results_df <- data.frame(
+    MOTIF = all_kmers_vector,         # Character vector of all possible K-mers (uppercase)
+    COUNT = as.integer(kmer_counts),  # Ensure counts are integer
+    stringsAsFactors = FALSE
+  )
+  return(results_df)
 }
 
 

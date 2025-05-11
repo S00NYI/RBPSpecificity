@@ -652,4 +652,209 @@ countKmers <- function(sequences, K, type = "DNA") {
 }
 
 
+#' Generate a Single Set of Background Sequences
+#'
+#' @description Creates one set of scrambled background sequences by randomly
+#'   shifting original peak locations, removing overlaps with original peaks,
+#'   extracting sequences, and then scrambling them.
+#'
+#' @param peak_gr A GRanges object representing the original genomic peaks.
+#' @param genome_obj A BSgenome object from which sequences will be extracted.
+#' @param K Integer, the K-mer length. This is used to set a minimum length
+#'   for sequences extracted by the internal call to `getSequence`.
+#' @param Bkg_dist Integer, the minimum absolute distance (in base pairs) by which
+#'   peaks should be shifted. Passed as `X` to `genRNDist()`.
+#' @param max_shift_dist Integer, the maximum absolute distance (in base pairs)
+#'   for shifting peaks. Passed as `max_dist` to `genRNDist()`.
+#'
+#' @return A DNAStringSet object of one set of scrambled background sequences.
+#'   Returns an empty DNAStringSet if no valid background regions/sequences
+#'   could be generated.
+#'
+#' @importFrom GenomicRanges GRanges shift findOverlaps width # width needed if getSequence min_length needs it
+#' @importFrom Biostrings DNAStringSet BString subject # For lapply with scrambleDNA
+#' @importFrom S4Vectors queryHits
+#' @importFrom methods is
+#'
+#' @keywords internal
+generateBkgSet <- function(peak_gr, genome_obj, K,
+                           Bkg_dist, max_shift_dist) {
+
+  # Input Validation
+  if (!methods::is(peak_gr, "GRanges") || length(peak_gr) == 0) {
+    stop("'peak_gr' must be a non-empty GRanges object in generateBkgSet.")
+  }
+  if (!methods::is(genome_obj, "BSgenome")) {
+    stop("'genome_obj' must be a BSgenome object in generateBkgSet.")
+  }
+  if (!is.numeric(K) || length(K) != 1 || K <= 0 || K %% 1 != 0) {
+    stop("'K' must be a single positive integer in generateBkgSet.")
+  }
+  # Bkg_dist and max_shift_dist validation is handled by genRNDist
+
+  num_peaks <- length(peak_gr)
+
+  # Generate random shift distances
+  rand_distances <- genRNDist(N = num_peaks, X = Bkg_dist, max_dist = max_shift_dist)
+
+  # Shift original peaks
+  # Suppress warnings for out-of-bounds shifts; getSequence will trim.
+  shifted_gr <- suppressWarnings(GenomicRanges::shift(peak_gr, shift = rand_distances))
+
+  # Remove shifted regions that overlap with ANY original peak
+  # type = "any" means any kind of overlap.
+  # select = "all" gives all pairs. We need queryHits to index shifted_gr.
+  # ignore.strand = TRUE because overlaps are purely positional for background exclusion.
+  overlaps_with_original <- GenomicRanges::findOverlaps(
+    shifted_gr,
+    peak_gr,
+    type = "any",
+    select = "all",
+    ignore.strand = TRUE
+  )
+
+  indices_to_remove <- S4Vectors::queryHits(overlaps_with_original)
+  if (length(indices_to_remove) > 0) {
+    shifted_gr_filtered <- shifted_gr[-indices_to_remove]
+  } else {
+    shifted_gr_filtered <- shifted_gr
+  }
+
+  if (length(shifted_gr_filtered) == 0) {
+    # No valid non-overlapping regions generated
+    return(Biostrings::DNAStringSet())
+  }
+
+  # Get sequences for the valid background regions
+  # No additional extension (extension = 0).
+  # Sequences must be at least K long for countKmers to work.
+  background_seqs_gr <- getSequence(
+    granges_obj = shifted_gr_filtered,
+    genome_obj = genome_obj,
+    extension = 0,
+    min_length = K # Ensure sequences are viable for K-mer counting
+  )
+
+  if (length(background_seqs_gr) == 0) {
+    # No valid sequences obtained (e.g., all trimmed to < K length)
+    return(Biostrings::DNAStringSet())
+  }
+
+  # Scramble sequences
+  # scrambleDNA works on a single sequence. Use lapply for DNAStringSet.
+  # as.list converts DNAStringSet to a list of individual DNAString objects.
+  scrambled_seq_list <- lapply(as.list(background_seqs_gr), scrambleDNA)
+  final_scrambled_seqs <- Biostrings::DNAStringSet(scrambled_seq_list)
+
+  # Filter out any truly empty sequences that might result if scrambleDNA returned empty
+  # (Our scrambleDNA returns empty DNAString for empty/NA input, which then results in 0-width here)
+  final_scrambled_seqs <- final_scrambled_seqs[Biostrings::width(final_scrambled_seqs) > 0]
+
+  if (length(final_scrambled_seqs) == 0) {
+    return(Biostrings::DNAStringSet())
+  }
+
+  return(final_scrambled_seqs)
+}
+
+
+#' Normalize a Vector of Scores
+#'
+#' @description Applies a specified normalization method to a numeric vector of scores.
+#'
+#' @param scores A numeric vector.
+#' @param method Character string (case-insensitive), the normalization method to apply.
+#'   Supported methods: "min_max" (default), "z_score", "log2", "none".
+#' @param pseudocount Numeric, pseudocount added before log2 transformation
+#'   (relevant only if `method = "log2"`). Default: 1.
+#' @param ... Additional arguments passed to specific normalization methods.
+#'   For "min_max", these are `a` and `b` for the target range (defaults to 0 and 1
+#'   respectively if not provided, via `minmaxNorm` defaults).
+#'
+#' @return A numeric vector of normalized scores.
+#'
+#' @importFrom stats sd mean
+#' @keywords internal # Or could be exported if generally useful
+#'
+#' @examples
+#' \dontrun{
+#'   test_scores <- c(10, 20, 30, 40, 50, NA)
+#'   normalizeScores(test_scores, method = "min_max")
+#'   normalizeScores(test_scores, method = "min_max", a = 0, b = 10)
+#'   normalizeScores(test_scores, method = "z_score")
+#'   normalizeScores(c(0, 1, 3, 7, 15, NA), method = "log2") # Uses pseudocount = 1
+#'   normalizeScores(c(0, 1, 3, 7, 15), method = "log2", pseudocount = 0.1)
+#'   normalizeScores(test_scores, method = "none") # Returns original scores
+#' }
+normalizeScores <- function(scores, method = "min_max", pseudocount = 1, ...) {
+  # Validate scores input
+  if (!is.numeric(scores)) {
+    stop("'scores' must be a numeric vector.")
+  }
+  if (length(scores) == 0) {
+    return(numeric(0)) # Return empty numeric if input is empty
+  }
+
+  # Validate method input
+  if (!is.character(method) || length(method) != 1) {
+    stop("'method' must be a single character string.")
+  }
+
+  method_upper <- toupper(method)
+  additional_args <- list(...)
+
+  normalized_scores <- switch(
+    method_upper,
+    "MIN_MAX" = {
+      # Pass additional_args (like a, b) to minmaxNorm
+      # minmaxNorm has defaults a=0, b=1 if not provided in ...
+      do.call(minmaxNorm, c(list(x = scores), additional_args))
+    },
+    "Z_SCORE" = {
+      if (length(additional_args) > 0) {
+        warning("Additional arguments in '...' are ignored for Z-score normalization.")
+      }
+      mean_s <- stats::mean(scores, na.rm = TRUE)
+      sd_s <- stats::sd(scores, na.rm = TRUE)
+      if (is.na(sd_s)) { # Happens if too few non-NA values
+        warning("Cannot compute Z-scores (standard deviation is NA). Returning NAs.")
+        return(rep(NA_real_, length(scores)))
+      }
+      if (sd_s == 0) {
+        # If all non-NA values are the same, Z-score is typically 0
+        # or could be NA/NaN depending on convention. Returning 0 for non-NA.
+        warning("Standard deviation is zero. Z-scores for non-NA values will be 0.")
+        result <- rep(NA_real_, length(scores))
+        result[!is.na(scores)] <- 0
+        return(result)
+      }
+      (scores - mean_s) / sd_s
+    },
+    "LOG2" = {
+      if (length(additional_args) > 0) {
+        warning("Additional arguments in '...' are ignored for log2 normalization (except 'pseudocount').")
+      }
+      if (!is.numeric(pseudocount) || length(pseudocount) != 1) {
+        warning("'pseudocount' is not a single number, using default of 1.")
+        pseudocount <- 1
+      }
+
+      scores_plus_pseudo <- scores + pseudocount
+      if (any(scores_plus_pseudo <= 0, na.rm = TRUE)) {
+        warning("Some scores + pseudocount are <= 0. log2 will produce -Inf or NaN for these values.")
+      }
+      log2(scores_plus_pseudo)
+    },
+    "NONE" = {
+      if (length(additional_args) > 0) {
+        warning("Additional arguments in '...' are ignored when method is 'none'.")
+      }
+      scores
+    },
+    # Default case for switch if method_upper is not matched
+    stop("Unsupported normalization method: '", method,
+         "'. Supported methods are 'min_max', 'z_score', 'log2', 'none'.")
+  )
+  return(normalized_scores)
+}
 #-------------------------------------------------------------------------------

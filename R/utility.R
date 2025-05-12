@@ -54,21 +54,35 @@ minmaxNorm <- function(x, a = 0, b = 1) {
 #' @importFrom methods is
 #' @keywords internal
 scrambleDNA <- function(seq) {
-  # Handle NULL, NA, or empty input
-  if (is.null(seq) || is.na(seq) || nchar(as.character(seq)) == 0) {
+  # Robust check for NULL, NA, or empty string content
+  # Use any(is.na(seq)) to handle cases where is.na(seq) might return a vector,
+  # ensuring the condition for `||` is scalar.
+  if (is.null(seq) || any(is.na(seq)) || nchar(as.character(seq)) == 0) {
     return(Biostrings::DNAString())
   }
 
   # Ensure input is treated as character for splitting and sampling
-  if (methods::is(seq, "BString")) {
-    # Extract sequence if it's a Biostrings object (like DNAString)
-    char_seq <- as.character(Biostrings::subject(seq))
-  } else {
+  # For DNAString (which inherits XString), as.character() is well-defined.
+  if (methods::is(seq, "XString")) {
     char_seq <- as.character(seq)
+  } else {
+    char_seq <- as.character(seq) # For plain character strings
   }
 
-  # Split, sample, paste, and return as DNAString
+  # The nchar check above should already catch char_seq == ""
+  # but as an additional safeguard if seq was e.g. c("", "") and got through.
+  # However, the function is documented for a single sequence.
+  if (nchar(char_seq) == 0) { # Redundant if the first check worked, but safe.
+    return(Biostrings::DNAString())
+  }
+
   nucleotides <- unlist(strsplit(char_seq, split = ""))
+
+  # Ensure there's something to sample
+  if (length(nucleotides) == 0) {
+    return(Biostrings::DNAString())
+  }
+
   scrambled_nucleotides <- sample(nucleotides)
   scrambled_seq_char <- paste(scrambled_nucleotides, collapse = "")
 
@@ -324,23 +338,22 @@ selectGenome <- function(species_or_build) {
 #' @importFrom GenomicRanges GRanges makeGRangesFromDataFrame seqnames start end strand
 #' @importFrom methods is
 #' @keywords internal
-peakParse <- function(input, required_cols = c("chr", "start", "end"), keep_extra = TRUE) {
+peakParse <- function(input, standard_chroms_only = TRUE, keep_extra = TRUE) {
+
+  initial_gr <- NULL
 
   if (methods::is(input, "GRanges")) {
-    # If already GRanges, maybe perform minimal validation if needed?
-    # For now, assume it's valid if it's the right class.
-    return(input)
-
+    initial_gr <- input
   } else if (is.data.frame(input)) {
     df <- input
     col_names <- colnames(df)
 
-    # Check for required columns - flexible naming (chr/seqnames, start, end)
     chr_col <- NULL
     start_col <- NULL
     end_col <- NULL
     strand_col <- NULL # Optional
 
+    # Try to find chromosome column
     if ("seqnames" %in% col_names) chr_col <- "seqnames"
     else if ("chr" %in% col_names) chr_col <- "chr"
     else if ("chromosome" %in% col_names) chr_col <- "chromosome"
@@ -352,34 +365,60 @@ peakParse <- function(input, required_cols = c("chr", "start", "end"), keep_extr
     if ("end" %in% col_names) end_col <- "end"
     else stop("Input data frame must contain an 'end' column.")
 
-    # Check for optional strand column
     if ("strand" %in% col_names) strand_col <- "strand"
 
-
-    # Create GRanges
-    message("Attempting to create GRanges from data frame...")
-    gr <- tryCatch({
+    # message("Attempting to create GRanges from data frame in peakParse...")
+    initial_gr <- tryCatch({
       GenomicRanges::makeGRangesFromDataFrame(
         df = df,
         keep.extra.columns = keep_extra,
         seqnames.field = chr_col,
         start.field = start_col,
         end.field = end_col,
-        strand.field = if(!is.null(strand_col)) strand_col else character(0) # Handle optional strand
-        # ignore.strand = is.null(strand_col) # Handled by strand.field=character(0)
+        strand.field = if(!is.null(strand_col)) strand_col else character(0),
+        starts.in.df.are.0based = FALSE # Assume 1-based starts unless specified
       )
     }, error = function(e) {
-      stop("Failed to create GRanges object from data frame.\n",
-           "Please ensure columns '", chr_col, "', '", start_col, "', '", end_col,
-           "' (and optionally '", strand_col, "') are present and contain valid genomic coordinates.\n",
+      stop("Failed to create GRanges object from data frame in peakParse.\n",
+           "Ensure columns '", chr_col, "', '", start_col, "', '", end_col,
+           "' (and optionally '", strand_col, "') are present and valid.\n",
            "Original error: ", e$message)
     })
-    message("GRanges object created successfully.")
-    return(gr)
-
+    # message("GRanges object created successfully from data frame in peakParse.")
   } else {
-    stop("Input must be a data frame or a GRanges object. File path input not yet supported by this helper.")
+    stop("Input to peakParse must be a data frame or a GRanges object.")
   }
+
+  if (length(initial_gr) == 0) {
+    # message("peakParse received or resulted in an empty GRanges object before standard chromosome filtering.")
+    return(initial_gr) # Return empty GRanges if it's already empty
+  }
+
+  # Filter for standard chromosomes if requested
+  if (standard_chroms_only) {
+    original_len <- length(initial_gr)
+
+    # Note: keepStandardChromosomes works best if seqlevelsStyle is already UCSC (e.g. 'chr1', 'chrM').
+    # If your input uses 'MT' and BSgenome uses 'chrM', 'MT' might be dropped.
+    # You may need to ensure consistent chromosome naming for 'chrM' vs 'MT' *before* this step
+    # or add logic here to standardize mitochondrial chromosome name if needed.
+    # For example, if "chrMT" exists and "chrM" does not, and style is UCSC-like:
+    # current_sl <- GenomeInfoDb::seqlevels(initial_gr)
+    # if ("chrMT" %in% current_sl && !("chrM" %in% current_sl) && grepl("chr", current_sl[1])) {
+    #   message("Renaming 'chrMT' to 'chrM' in GRanges for standard chromosome filtering.")
+    #   GenomeInfoDb::seqlevels(initial_gr)[GenomeInfoDb::seqlevels(initial_gr) == "chrMT"] <- "chrM"
+    # }
+
+    filtered_gr <- GenomeInfoDb::keepStandardChromosomes(initial_gr, pruning.mode = "tidy")
+    num_removed <- original_len - length(filtered_gr)
+    if (num_removed > 0) {
+      message(num_removed, " ranges removed by filtering for standard chromosomes in peakParse().")
+    }
+    initial_gr <- filtered_gr
+  }
+
+  # message("peakParse returning GRanges object with ", length(initial_gr), " ranges.")
+  return(initial_gr)
 }
 
 
@@ -640,7 +679,7 @@ countKmers <- function(sequences, K, type = "DNA") {
 
   # Count K-mers
   # collapse = TRUE sums counts over all sequences in the DNAStringSet
-  kmer_counts <- Biostrings::vcountPDict(kmer_pdict, sequences, collapse = TRUE)
+  kmer_counts <- Biostrings::vcountPDict(kmer_pdict, sequences, collapse = 1L) # Use 1L for integer
 
   # Create and return results data frame
   results_df <- data.frame(

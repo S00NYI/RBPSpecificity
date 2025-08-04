@@ -1,7 +1,7 @@
 Package: RBPSpecificity
 Type: Package
 Title: RBP Inherent Specificity and Mutational Sensitivity Analysis Tool
-Version: 1.0.0
+Version: 1.1.0
 Description:
     Provides tools to analyze RNA Binding Protein (RBP) binding specificities
     from high-throughput sequencing data. Functions include calculating

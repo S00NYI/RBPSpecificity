@@ -28,19 +28,56 @@
 #' ms_average <- returnMS(enrichment_results, motif = "UGUGU", output_type = "number")
 #' }
 returnMS <- function(motif_enrichment, motif = NULL, output_type = "matrix", sensitivity_method = "1_minus_norm_score") {
-  # 1. Find target motif: findTopMotif() if motif is NULL/"top"
-  # 2. Validate target motif: valInputMotif()
-  # 3. Get score for the target reference motif
-  # 4. Generate all SNVs for the reference motif: genMotifVar()
-  # 5. Look up scores for all SNVs from motif_enrichment (handle missing variants)
-  # 6. Calculate sensitivity for each SNV: calSNVSens()
-  # 7. If output_type == "matrix":
-  #    a. Format results into matrix: formatMS()
-  #    b. Return matrix
-  # 8. If output_type == "number":
-  #    a. Calculate mean of SNV sensitivity scores (handle NAs)
-  #    b. Return average number
-  {}
+  # 1. Validate inputs
+  if (!is.data.frame(motif_enrichment) || !all(c("MOTIF", "Score") %in% colnames(motif_enrichment))) {
+    stop("'motif_enrichment' must be a data frame with 'MOTIF' and 'Score' columns.")
+  }
+  if (nrow(motif_enrichment) == 0) stop("Input 'motif_enrichment' data frame is empty.")
+  if (!output_type %in% c("matrix", "number")) stop("'output_type' must be 'matrix' or 'number'.")
+
+  # 2. Find and validate the target motif
+  if (is.null(motif) || motif == "top") {
+    target_motif <- findTopMotif(motif_enrichment)
+    message("No motif provided, using top-scoring motif: ", target_motif)
+  } else {
+    target_motif <- motif
+  }
+  kmer_size <- nchar(motif_enrichment$MOTIF[1])
+  valInputMotif(motif = target_motif, kmer_size = kmer_size, available_motifs = motif_enrichment$MOTIF)
+
+  # 3. Generate all SNVs for the reference motif
+  # For now, assume DNA. Could be made flexible later by checking motif content.
+  nucleotides_used <- if (grepl("U", target_motif)) c('A', 'C', 'G', 'U') else c('A', 'C', 'G', 'T')
+  all_variants <- genMotifVar(motif = target_motif, type = if('U' %in% nucleotides_used) "RNA" else "DNA")
+
+  # 4. Look up scores for the reference and all SNVs
+  reference_score <- motif_enrichment$Score[motif_enrichment$MOTIF == target_motif]
+
+  # Match all variants at once for efficiency
+  variant_indices <- match(all_variants, motif_enrichment$MOTIF)
+  valid_indices <- !is.na(variant_indices)
+
+  variant_scores <- motif_enrichment$Score[variant_indices[valid_indices]]
+  names(variant_scores) <- all_variants[valid_indices]
+
+  if (length(variant_scores) == 0) {
+    warning("No variants of the target motif were found in the enrichment data. Cannot calculate MS.")
+    return(if (output_type == "matrix") NA else NA_real_)
+  }
+
+  # 5. Calculate sensitivity for each SNV
+  snv_sensitivities <- calSNVSens(reference_score, variant_scores, method = sensitivity_method)
+
+  # 6. Return result based on output_type
+  if (output_type == "matrix") {
+    # Format the matrix
+    ms_matrix <- formatMS(snv_sensitivities, target_motif, kmer_size, nucleotides = nucleotides_used)
+    # NEW LINE: Attach the motif name as an attribute
+    attr(ms_matrix, "motif_name") <- target_motif
+    return(ms_matrix)
+  } else { # "number"
+    return(mean(snv_sensitivities, na.rm = TRUE))
+  }
 }
 
 
@@ -59,12 +96,31 @@ returnMS <- function(motif_enrichment, motif = NULL, output_type = "matrix", sen
 #'   the calculated sensitivity scores.
 #' @keywords internal
 calSNVSens <- function(reference_score, variant_scores, method = "1_minus_norm_score") {
-  # 1. Implement logic based on `method`
-  #    - e.g., for "1_minus_norm_score": `1 - variant_scores` (assumes scores were normalized 0-1)
-  #    - e.g., for "score_diff": `reference_score - variant_scores`
-  #    - e.g., for "log2_ratio": `log2(reference_score / variant_scores)` (handle zeros/negatives)
-  # 2. Return calculated sensitivity scores
-  {}
+  # Ensure variant_scores is a simple numeric vector for calculations
+  scores_vec <- unlist(variant_scores)
+
+  sensitivity_scores <- switch(
+    toupper(method),
+    "1_MINUS_NORM_SCORE" = {
+      # Assumes scores were normalized from 0-1, where 1 is the best.
+      # Sensitivity is high if the variant score is low.
+      1 - scores_vec
+    },
+    "SCORE_DIFF" = {
+      # Sensitivity is the difference between the reference and the variant.
+      reference_score - scores_vec
+    },
+    "LOG2_RATIO" = {
+      # Use a pseudocount to avoid division by zero or log of zero.
+      pseudocount <- 1e-6
+      log2((reference_score + pseudocount) / (scores_vec + pseudocount))
+    },
+    stop("Unsupported sensitivity 'method': ", method)
+  )
+
+  # Restore original names to the calculated scores
+  names(sensitivity_scores) <- names(variant_scores)
+  return(sensitivity_scores)
 }
 
 
@@ -83,16 +139,35 @@ calSNVSens <- function(reference_score, variant_scores, method = "1_minus_norm_s
 #'   The cell corresponding to the original nucleotide at a position might be NA or 0.
 #' @keywords internal
 formatMS <- function(snv_sensitivity_scores, reference_motif, K, nucleotides = c('A', 'C', 'G', 'T')) {
-  # (Based on original return_MS logic)
-  # 1. Initialize matrix (Nucs x Pos) with NAs
-  # 2. Loop through positions 1 to K
-  # 3. Loop through nucleotides
-  # 4. Construct the corresponding variant motif string
-  # 5. Find the sensitivity score for this variant in snv_sensitivity_scores
-  # 6. Place score in the matrix[nucleotide, position]
-  # 7. Handle the cell for the original nucleotide (e.g., set to NA or 0)
-  # 8. Return the formatted matrix
-  {}
+  # Initialize matrix (Nucs x Pos) with NAs
+  ms_matrix <- matrix(NA_real_,
+                      nrow = length(nucleotides),
+                      ncol = K,
+                      dimnames = list(nucleotides, paste0("Pos", 1:K)))
+
+  ref_chars <- strsplit(reference_motif, "")[[1]]
+
+  # Loop through each position and nucleotide to fill the matrix
+  for (pos in 1:K) {
+    for (nuc in nucleotides) {
+      # If this is the original nucleotide at this position, score is NA (no change)
+      if (nuc == ref_chars[pos]) {
+        ms_matrix[nuc, pos] <- NA_real_
+        next
+      }
+
+      # Construct the variant motif string to look up its score
+      variant_chars <- ref_chars
+      variant_chars[pos] <- nuc
+      variant_motif <- paste0(variant_chars, collapse = "")
+
+      # Find the sensitivity score for this variant
+      if (variant_motif %in% names(snv_sensitivity_scores)) {
+        ms_matrix[nuc, pos] <- snv_sensitivity_scores[[variant_motif]]
+      }
+    }
+  }
+  return(ms_matrix)
 }
 
 #-------------------------------------------------------------------------------

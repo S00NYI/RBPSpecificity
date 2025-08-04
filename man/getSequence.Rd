@@ -4,17 +4,45 @@
 \alias{getSequence}
 \title{Get Sequences from GRanges}
 \usage{
-getSequence(granges_obj, genome_obj)
+getSequence(
+  granges_obj,
+  genome_obj,
+  extension = 0,
+  resize_fix = "end",
+  min_length = 1
+)
 }
 \arguments{
 \item{granges_obj}{A GRanges object.}
 
 \item{genome_obj}{A BSgenome object.}
+
+\item{extension}{Integer, number of base pairs to extend each range from its
+5'-end (upstream). Positive values extend, negative values shorten from
+the 5'-end, keeping the 3'-end fixed. Default: 0 (no change).}
+
+\item{resize_fix}{Character string, determines which part of the original range
+is anchored when applying the `extension`. For 5'-end extension, "end"
+(default) anchors the 3'-end of the original range. "start" would anchor
+the 5'-end (extending the 3'-end), and "center" expands/contracts from
+the center. This is passed to `GenomicRanges::resize()`.}
+
+\item{min_length}{Integer, the minimum acceptable length of a range after
+any resizing. Ranges shorter than this will be removed. Default: 1.}
 }
 \value{
-A DNAStringSet object containing the sequences.
+A DNAStringSet object containing the extracted sequences. Names of the
+  sequences in the set will correspond to the names of the processed GRanges
+  object (if names were present on the input and preserved). Original metadata
+  columns are preserved on the intermediate GRanges object used for sequence
+  extraction. Returns an empty DNAStringSet if input `granges_obj` is empty
+  or if all ranges are filtered out.
 }
 \description{
-Extracts DNA sequences for a set of genomic ranges from a BSgenome object.
+Extracts DNA sequences for a set of genomic ranges from a
+  BSgenome object. Optionally extends ranges from their 5'-end, filters by
+  minimum length, and ensures ranges are valid within chromosome boundaries.
+  Original metadata columns (`mcols`) and names from the input `granges_obj`
+  are preserved for the ranges that successfully yield sequences.
 }
 \keyword{internal}

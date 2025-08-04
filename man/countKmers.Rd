@@ -4,19 +4,46 @@
 \alias{countKmers}
 \title{Count K-mers in Sequences}
 \usage{
-countKmers(sequences, K, nucleotides = c("A", "C", "G", "T"))
+countKmers(sequences, K, type = "DNA")
 }
 \arguments{
-\item{sequences}{A DNAStringSet object.}
+\item{sequences}{A DNAStringSet object, typically the output from
+\code{\link{getSequence}}.}
 
-\item{K}{Integer, the K-mer size.}
+\item{K}{Integer, the K-mer size (length of motifs). Must be a single
+positive integer.}
 
-\item{nucleotides}{Character vector of nucleotides (default: DNA).}
+\item{type}{Character string specifying the nucleic acid type for K-mer
+generation. Accepted values are "DNA" (using A,C,G,T) or "RNA"
+(using A,C,G,U). The input is case-insensitive. Default: "DNA".}
 }
 \value{
-A data frame with 'MOTIF' and 'COUNT' columns.
+A data frame with two columns: 'MOTIF' (character, all possible
+  K-mers in uppercase) and 'COUNT' (integer). 'COUNT' is the total
+  count of each K-mer across all input sequences. Returns a data frame
+  with all possible K-mers and 0 counts if input sequences are empty or
+  if all sequences are shorter than K.
 }
 \description{
-Counts occurrences of all possible K-mers within a DNAStringSet.
+Counts occurrences of all possible K-mers of a given length
+  within a DNAStringSet. This function is case-sensitive for motifs once
+  generated (all K-mers are generated in uppercase).
+}
+\examples{
+\dontrun{
+  # Assuming 'seqs' is a DNAStringSet object and 'getSequence' is available
+  # library(Biostrings)
+  # seqs_dna <- DNAStringSet(c("ATGCGATGC", "GGCCTTAA", "TTT"))
+  # countKmers(seqs_dna, K = 3, type = "DNA")
+
+  # seqs_rna <- DNAStringSet(c("AUGCGAUGC", "GGCCUUAA", "UUU"))
+  # countKmers(seqs_rna, K = 3, type = "RNA")
+
+  # Empty input
+  # countKmers(DNAStringSet(), K = 3)
+
+  # Sequences shorter than K
+  # countKmers(DNAStringSet(c("A", "CG")), K = 3)
+}
 }
 \keyword{internal}

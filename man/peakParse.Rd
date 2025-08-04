@@ -4,17 +4,17 @@
 \alias{peakParse}
 \title{Parse Peak Input Data}
 \usage{
-peakParse(input, required_cols = c("chr", "start", "end"), keep_extra = TRUE)
+peakParse(input, standard_chroms_only = TRUE, keep_extra = TRUE)
 }
 \arguments{
 \item{input}{Can be a data frame (with chr, start, end columns), or a GRanges object.
 File path input is not yet supported by this helper.}
 
-\item{required_cols}{Character vector of essential column names expected if input is a data frame
-(default: c("chr", "start", "end")). Common alternatives like "seqnames" are handled.}
-
 \item{keep_extra}{Logical, if TRUE, keep additional metadata columns when converting
 data frame to GRanges (default: TRUE).}
+
+\item{required_cols}{Character vector of essential column names expected if input is a data frame
+(default: c("chr", "start", "end")). Common alternatives like "seqnames" are handled.}
 }
 \value{
 A GRanges object representing the peaks.

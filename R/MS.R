@@ -1,82 +1,101 @@
-# Functions related to calculating Mutational Sensitivity (MS)
-
 #' Calculate Mutational Sensitivity (MS)
 #'
-#' @description Calculates the Mutational Sensitivity (MS) for a target motif.
-#' MS reflects how much the enrichment score changes upon single nucleotide
-#' variations (SNVs) in the motif.
+#' @description Calculates the Mutational Sensitivity (MS) for a target motif or
+#'   for all motifs. MS reflects how much the enrichment score changes upon
+#'   single nucleotide variations (SNVs).
 #'
-#' @param motif_enrichment A data frame containing motif enrichment scores
-#'   (output from `motifEnrichment()`). Requires 'MOTIF' and 'Score' columns.
-#' @param motif Character string, the reference motif for which to calculate MS.
-#'   If NULL or "top", the motif with the highest score is used (default: NULL).
-#' @param output_type Character string, specifying the output format:
-#'   "matrix" returns a matrix of sensitivity scores for each SNV (Nucleotide x Position),
-#'   "number" returns a single average sensitivity score across all SNVs (default: "matrix").
-#' @param sensitivity_method Character string defining how sensitivity is calculated
-#'   (e.g., "1_minus_norm_score", "score_diff", "log2_ratio") (default: "1_minus_norm_score").
+#' @param motif_enrichment A data frame with 'MOTIF' and 'Score' columns.
+#' @param motif Character string, the reference motif. Only used if
+#'   `return_type = "specific"`. If NULL or "top", the top-scoring motif is used.
+#' @param return_type Character string, either "specific" (default) or "all".
+#'   If "specific", calculates MS for one motif. If "all", calculates an
+#'   average MS score for every motif.
+#' @param output_type Character string, specifying the output format if
+#'   `return_type = "specific"`: "matrix" (default) or "number". Ignored if
+#'   `return_type = "all"`.
+#' @param sensitivity_method Character string defining how sensitivity is calculated.
+#'   Default: "1_minus_norm_score".
 #'
-#' @return Depending on `output_type`:
-#'   - A matrix with nucleotides as rows and positions as columns, containing sensitivity scores.
-#'   - A single numeric value representing the average sensitivity score.
+#' @return Depends on inputs:
+#'   - If `return_type = "specific"` and `output_type = "matrix"`: An MS matrix.
+#'   - If `return_type = "specific"` and `output_type = "number"`: A single numeric MS score.
+#'   - If `return_type = "all"`: A data frame with 'MOTIF' and 'MS' columns.
 #' @export
-#'
-#' @examples
-#' \dontrun{
-#' # Assuming enrichment_results is output from motifEnrichment()
-#' ms_matrix <- returnMS(enrichment_results, motif = "UGUGU", output_type = "matrix")
-#' ms_average <- returnMS(enrichment_results, motif = "UGUGU", output_type = "number")
-#' }
-returnMS <- function(motif_enrichment, motif = NULL, output_type = "matrix", sensitivity_method = "1_minus_norm_score") {
-  # 1. Validate inputs
+returnMS <- function(motif_enrichment, motif = NULL, return_type = "specific",
+                     output_type = "matrix", sensitivity_method = "1_minus_norm_score") {
+  # --- Input Validation ---
   if (!is.data.frame(motif_enrichment) || !all(c("MOTIF", "Score") %in% colnames(motif_enrichment))) {
     stop("'motif_enrichment' must be a data frame with 'MOTIF' and 'Score' columns.")
   }
   if (nrow(motif_enrichment) == 0) stop("Input 'motif_enrichment' data frame is empty.")
-  if (!output_type %in% c("matrix", "number")) stop("'output_type' must be 'matrix' or 'number'.")
+  if (!return_type %in% c("specific", "all")) stop("'return_type' must be 'specific' or 'all'.")
 
-  # 2. Find and validate the target motif
-  if (is.null(motif) || motif == "top") {
-    target_motif <- findTopMotif(motif_enrichment)
-    message("No motif provided, using top-scoring motif: ", target_motif)
-  } else {
-    target_motif <- motif
-  }
-  kmer_size <- nchar(motif_enrichment$MOTIF[1])
-  valInputMotif(motif = target_motif, kmer_size = kmer_size, available_motifs = motif_enrichment$MOTIF)
+  # --- Logic based on return_type ---
+  if (return_type == "specific") {
+    # --- Calculate for a single motif (original logic) ---
+    if (!output_type %in% c("matrix", "number")) stop("'output_type' must be 'matrix' or 'number' for specific return.")
+    if (is.null(motif) || motif == "top") {
+      target_motif <- findTopMotif(motif_enrichment)
+      message("No motif provided, using top-scoring motif: ", target_motif)
+    } else {
+      target_motif <- motif
+    }
+    kmer_size <- nchar(motif_enrichment$MOTIF[1])
+    valInputMotif(motif = target_motif, kmer_size = kmer_size, available_motifs = motif_enrichment$MOTIF)
 
-  # 3. Generate all SNVs for the reference motif
-  # For now, assume DNA. Could be made flexible later by checking motif content.
-  nucleotides_used <- if (grepl("U", target_motif)) c('A', 'C', 'G', 'U') else c('A', 'C', 'G', 'T')
-  all_variants <- genMotifVar(motif = target_motif, type = if('U' %in% nucleotides_used) "RNA" else "DNA")
+    nucleotides_used <- if (grepl("U", target_motif)) c('A', 'C', 'G', 'U') else c('A', 'C', 'G', 'T')
+    all_variants <- genMotifVar(motif = target_motif, type = if('U' %in% nucleotides_used) "RNA" else "DNA")
 
-  # 4. Look up scores for the reference and all SNVs
-  reference_score <- motif_enrichment$Score[motif_enrichment$MOTIF == target_motif]
+    reference_score <- motif_enrichment$Score[motif_enrichment$MOTIF == target_motif]
+    variant_indices <- match(all_variants, motif_enrichment$MOTIF)
+    valid_indices <- !is.na(variant_indices)
+    variant_scores <- motif_enrichment$Score[variant_indices[valid_indices]]
+    names(variant_scores) <- all_variants[valid_indices]
 
-  # Match all variants at once for efficiency
-  variant_indices <- match(all_variants, motif_enrichment$MOTIF)
-  valid_indices <- !is.na(variant_indices)
+    if (length(variant_scores) == 0) {
+      warning("No variants of the target motif found. Cannot calculate MS.")
+      return(if (output_type == "matrix") NA else NA_real_)
+    }
 
-  variant_scores <- motif_enrichment$Score[variant_indices[valid_indices]]
-  names(variant_scores) <- all_variants[valid_indices]
+    snv_sensitivities <- calSNVSens(reference_score, variant_scores, method = sensitivity_method)
 
-  if (length(variant_scores) == 0) {
-    warning("No variants of the target motif were found in the enrichment data. Cannot calculate MS.")
-    return(if (output_type == "matrix") NA else NA_real_)
-  }
+    if (output_type == "matrix") {
+      ms_matrix <- formatMS(snv_sensitivities, target_motif, kmer_size, nucleotides = nucleotides_used)
+      attr(ms_matrix, "motif_name") <- target_motif
+      return(ms_matrix)
+    } else { # "number"
+      return(mean(snv_sensitivities, na.rm = TRUE))
+    }
 
-  # 5. Calculate sensitivity for each SNV
-  snv_sensitivities <- calSNVSens(reference_score, variant_scores, method = sensitivity_method)
+  } else { # return_type == "all"
+    # --- Calculate for all motifs ---
+    message("Calculating MS for all ", nrow(motif_enrichment), " motifs. This may take a while...")
+    all_motifs <- motif_enrichment$MOTIF
+    ms_values <- numeric(length(all_motifs))
+    pb <- utils::txtProgressBar(min = 0, max = length(all_motifs), style = 3)
 
-  # 6. Return result based on output_type
-  if (output_type == "matrix") {
-    # Format the matrix
-    ms_matrix <- formatMS(snv_sensitivities, target_motif, kmer_size, nucleotides = nucleotides_used)
-    # NEW LINE: Attach the motif name as an attribute
-    attr(ms_matrix, "motif_name") <- target_motif
-    return(ms_matrix)
-  } else { # "number"
-    return(mean(snv_sensitivities, na.rm = TRUE))
+    for (i in seq_along(all_motifs)) {
+      target_motif <- all_motifs[i]
+      nucleotides_used <- if (grepl("U", target_motif)) c('A', 'C', 'G', 'U') else c('A', 'C', 'G', 'T')
+      all_variants <- genMotifVar(motif = target_motif, type = if('U' %in% nucleotides_used) "RNA" else "DNA")
+
+      reference_score <- motif_enrichment$Score[i]
+      variant_indices <- match(all_variants, all_motifs)
+      valid_indices <- !is.na(variant_indices)
+      variant_scores <- motif_enrichment$Score[variant_indices[valid_indices]]
+
+      if (length(variant_scores) > 0) {
+        snv_sensitivities <- 1 - variant_scores # Using the default method directly for speed
+        ms_values[i] <- mean(snv_sensitivities, na.rm = TRUE)
+      } else {
+        ms_values[i] <- NA_real_
+      }
+      utils::setTxtProgressBar(pb, i)
+    }
+    close(pb)
+
+    results_df <- data.frame(MOTIF = all_motifs, MS = ms_values)
+    return(results_df)
   }
 }
 

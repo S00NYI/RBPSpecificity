@@ -30,8 +30,8 @@
 #'   Returns a data frame with 0 counts if no valid background sequences
 #'   could be generated across all iterations.
 #'
-#' @importFrom Biostrings DNAStringSet # For creating an empty set for template
-#' @importFrom S4Vectors elementNROWS # Though check is within generateBkgSet/countKmers too
+#' @importFrom Biostrings DNAStringSet
+#' @importFrom S4Vectors elementNROWS
 #' @importFrom utils txtProgressBar setTxtProgressBar
 #' @importFrom methods is
 #'
@@ -162,7 +162,7 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
 #'
 #' @return A data frame with 'MOTIF' and 'EnrichmentScore' columns.
 #'
-#' @importFrom dplyr inner_join select mutate arrange desc # For data manipulation
+#' @importFrom dplyr inner_join select mutate arrange desc
 #' @keywords internal # Helper for the main motifEnrichment function
 calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
                           method = "subtract", pseudocount = 1) {
@@ -228,6 +228,159 @@ calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
   # enriched_df <- enriched_df %>% dplyr::arrange(dplyr::desc(EnrichmentScore))
 
   return(enriched_df)
+}
+
+#' Calculate K-mer Motif Enrichment from Peak Data
+#'
+#' @description
+#' This is the main workflow function for the RBPSpecificity package. It processes
+#' RBP binding peak data (e.g., from eCLIP experiments) to calculate normalized,
+#' background-corrected enrichment scores for all K-mers of a given length.
+#'
+#' @details
+#' The workflow proceeds as follows:
+#' 1.  Parses input peak data into a standardized GRanges object.
+#' 2.  Loads the specified BSgenome object for sequence retrieval.
+#' 3.  Extracts sequences for peak regions, applying an optional 5'-end extension.
+#' 4.  Counts K-mers within the peak sequences.
+#' 5.  Generates an averaged K-mer profile from multiple background sets. Background
+#'     sets are created by shifting and scrambling genomic regions.
+#' 6.  Calculates enrichment scores by comparing peak counts to background counts.
+#' 7.  Normalizes the final enrichment scores to a standard scale.
+#'
+#' @param peak_data A data frame or GRanges object containing peak data. If a
+#'   data frame, it must contain columns for chromosome, start, and end coordinates.
+#' @param species_or_build Character string identifying the genome build (e.g.,
+#'   "hg38", "mm10"). This is used to load the appropriate BSgenome package.
+#' @param K Integer, the length of the K-mers to analyze (e.g., 5).
+#' @param extension Integer, the number of base pairs to extend each peak from its
+#'   5'-end (upstream). Default: 0.
+#' @param enrichment_method Character string, the method for calculating enrichment.
+#'   Supported: "subtract" (default), "fold_change", "log2_fold_change".
+#' @param normalization_method Character string, the method for normalizing the final
+#'   enrichment scores. Supported: "min_max" (default), "z_score", "log2", "none".
+#' @param Bkg_number Integer, the number of background iterations to perform for averaging.
+#'   Default: 100.
+#' @param Bkg_dist Integer, the minimum distance (in base pairs) to shift peaks when
+#'   creating background regions. Default: 500.
+#' @param max_shift_dist Integer, the maximum distance for shifting peaks. Default: 1000.
+#' @param nucleic_acid_type Character string, "DNA" or "RNA". Determines the alphabet
+#'   for K-mer generation. Default: "DNA".
+#' @param ... Additional arguments passed to `normalizeScores()` (e.g., `a=0, b=1`
+#'   for min-max normalization).
+#'
+#' @return A data frame containing two columns: 'MOTIF' (all possible K-mers) and
+#'   'Score' (the final, normalized enrichment score).
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # This is a conceptual example, as it requires real data and a BSgenome package.
+#' # Assume 'my_peak_df' is a data frame with chr, start, end columns.
+#'
+#' enrichment_results <- motifEnrichment(
+#'   peak_data = my_peak_df,
+#'   species_or_build = "hg38",
+#'   K = 5,
+#'   extension = 25,
+#'   enrichment_method = "subtract",
+#'   normalization_method = "min_max"
+#' )
+#'
+#' head(enrichment_results)
+#' }
+motifEnrichment <- function(peak_data,
+                            species_or_build,
+                            K,
+                            extension = 0,
+                            enrichment_method = "subtract",
+                            normalization_method = "min_max",
+                            Bkg_number = 100,
+                            Bkg_dist = 500,
+                            max_shift_dist = 1000,
+                            nucleic_acid_type = "DNA",
+                            ...) {
+
+  # --- 1. Input Validation and Setup ---
+  message("--- Phase 1: Initializing and Validating Inputs ---")
+  if (missing(peak_data) || missing(species_or_build) || missing(K)) {
+    stop("Arguments 'peak_data', 'species_or_build', and 'K' are required.")
+  }
+
+  # Load genome object
+  genome_obj <- selectGenome(species_or_build)
+  message("Successfully loaded genome: ", species_or_build)
+
+  # Parse peak data into GRanges
+  peak_gr <- peakParse(input = peak_data)
+  if (length(peak_gr) == 0) {
+    stop("Peak data is empty after parsing and filtering. Cannot proceed.")
+  }
+  message("Successfully parsed ", length(peak_gr), " peaks.")
+
+  # --- 2. Peak Sequence Processing ---
+  message("\n--- Phase 2: Processing Peak Sequences ---")
+  peak_sequences <- getSequence(
+    granges_obj = peak_gr,
+    genome_obj = genome_obj,
+    extension = extension,
+    min_length = K
+  )
+  if (length(peak_sequences) == 0) {
+    stop("No sequences retrieved from peaks. Check peak coordinates and chromosome names.")
+  }
+  message("Retrieved ", length(peak_sequences), " sequences from peak regions.")
+
+  # Count K-mers in peaks
+  peak_kmer_counts <- countKmers(
+    sequences = peak_sequences,
+    K = K,
+    type = nucleic_acid_type
+  )
+  message("Counted K-mers in peak sequences. Found ", sum(peak_kmer_counts$COUNT > 0), " non-zero K-mers.")
+
+  # --- 3. Background Calculation ---
+  message("\n--- Phase 3: Generating Background Profile ---")
+  bkg_kmer_counts <- countKmersBkg(
+    original_peak_gr = peak_gr,
+    K = K,
+    type = nucleic_acid_type,
+    genome_obj = genome_obj,
+    Bkg_dist = Bkg_dist,
+    Bkg_number = Bkg_number,
+    max_shift_dist = max_shift_dist
+  )
+  message("Generated average background K-mer profile.")
+
+  # --- 4. Enrichment and Normalization ---
+  message("\n--- Phase 4: Calculating Final Enrichment Scores ---")
+  # Calculate background-corrected enrichment
+  enrichment_scores <- calEnrichment(
+    peak_kmer_counts_df = peak_kmer_counts,
+    avg_bkg_counts_df = bkg_kmer_counts,
+    method = enrichment_method
+  )
+  message("Calculated enrichment using '", enrichment_method, "' method.")
+
+  # Normalize the final scores
+  final_scores <- normalizeScores(
+    scores = enrichment_scores$EnrichmentScore,
+    method = normalization_method,
+    ...
+  )
+  message("Normalized final scores using '", normalization_method, "' method.")
+
+  # --- 5. Return Final Data Frame ---
+  results_df <- data.frame(
+    MOTIF = enrichment_scores$MOTIF,
+    Score = final_scores
+  )
+
+  # In case normalization produced NaNs (e.g., z-score on constant values), replace with 0
+  results_df$Score[is.nan(results_df$Score)] <- 0
+
+  message("\n--- Workflow Complete ---")
+  return(results_df)
 }
 
 #-------------------------------------------------------------------------------

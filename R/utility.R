@@ -450,8 +450,8 @@ peakParse <- function(input, standard_chroms_only = TRUE, keep_extra = TRUE) {
 #'   extraction. Returns an empty DNAStringSet if input `granges_obj` is empty
 #'   or if all ranges are filtered out.
 #' @importFrom Biostrings getSeq DNAStringSet
-#' @importFrom GenomicRanges GRanges resize width strand seqnames seqlengths trim
-#' @importFrom GenomeInfoDb seqlengths<- seqlevels seqlevelsInUse keepSeqlevels
+#' @importFrom GenomicRanges GRanges resize width strand seqnames trim
+#' @importFrom GenomeInfoDb seqlengths<- seqlevels seqlevelsInUse keepSeqlevels seqlengths
 #' @importFrom S4Vectors mcols mcols<-
 #' @importFrom methods is
 #' @keywords internal
@@ -613,7 +613,7 @@ getSequence <- function(granges_obj, genome_obj, extension = 0, resize_fix = "en
 #'   if all sequences are shorter than K.
 #'
 #' @importFrom Biostrings DNAStringSet PDict vcountPDict
-#' @importFrom S4Vectors elementNROWS # To get lengths of individual sequences in DNAStringSet
+#' @importFrom S4Vectors elementNROWS
 #' @importFrom methods is
 #' @keywords internal
 #'
@@ -710,8 +710,8 @@ countKmers <- function(sequences, K, type = "DNA") {
 #'   Returns an empty DNAStringSet if no valid background regions/sequences
 #'   could be generated.
 #'
-#' @importFrom GenomicRanges GRanges shift findOverlaps width # width needed if getSequence min_length needs it
-#' @importFrom Biostrings DNAStringSet BString subject # For lapply with scrambleDNA
+#' @importFrom GenomicRanges GRanges shift findOverlaps width
+#' @importFrom Biostrings DNAStringSet BString subject
 #' @importFrom S4Vectors queryHits
 #' @importFrom methods is
 #'
@@ -812,7 +812,7 @@ generateBkgSet <- function(peak_gr, genome_obj, K,
 #'
 #' @return A numeric vector of normalized scores.
 #'
-#' @importFrom stats sd mean
+#' @importFrom stats sd
 #' @keywords internal # Or could be exported if generally useful
 #'
 #' @examples
@@ -853,7 +853,7 @@ normalizeScores <- function(scores, method = "min_max", pseudocount = 1, ...) {
       if (length(additional_args) > 0) {
         warning("Additional arguments in '...' are ignored for Z-score normalization.")
       }
-      mean_s <- stats::mean(scores, na.rm = TRUE)
+      mean_s <- mean(scores, na.rm = TRUE)
       sd_s <- stats::sd(scores, na.rm = TRUE)
       if (is.na(sd_s)) { # Happens if too few non-NA values
         warning("Cannot compute Z-scores (standard deviation is NA). Returning NAs.")

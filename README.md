@@ -46,11 +46,22 @@ RBPSpecificity provides a step-by-step approach to analyze RBP binding data:
 
 ## Installation
 
-You can install the development version of `RBPSpecificity` from [GitHub](https://github.com/your_github_username/RBPSpecificity) using the `devtools` package (or the `remotes` package).
+You can install the development version of `RBPSpecificity` from [GitHub](https://github.com/S00NYI/RBPSpecificity) using the `devtools` package (or the `remotes` package).
 
-First, ensure you have `devtools` installed:
+First, ensure you have `remotes` installed by running this in your R console:
 
 ```r
-if (!requireNamespace("devtools", quietly = TRUE)) {
-    install.packages("devtools")
+if (!requireNamespace("remotes", quietly = TRUE)) {
+    install.packages("remotes")
 }
+```
+Then, you can install RBPSpecificity:
+```r
+remotes::install_github("S00NYI/RBPSpecificity")
+```
+
+Once installed, load the package:
+
+```r
+library(RBPSpecificity)
+```

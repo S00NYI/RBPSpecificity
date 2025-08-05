@@ -522,7 +522,7 @@ getSequence <- function(granges_obj, genome_obj, extension = 0, resize_fix = "en
 
   if (any(!keep_idx_min_length)) {
     num_removed_min_length <- sum(!keep_idx_min_length)
-    message(num_removed_min_length, " ranges removed because their final length was less than min_length (", min_length, ").")
+    # message(num_removed_min_length, " ranges removed because their final length was less than min_length (", min_length, ").")
     current_gr <- current_gr[keep_idx_min_length]
   }
 

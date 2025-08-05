@@ -58,6 +58,7 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
             ") is less than K (", K, "). Background sequences might be too short for K-mer counting.")
   }
 
+  message("Note: During background generation, any regions shorter than K=", K, " will be removed.")
 
   # Get the template of all possible K-mers to define rows and order
   # Call countKmers with an empty DNAStringSet to get the MOTIF column structure

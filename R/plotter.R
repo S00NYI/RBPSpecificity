@@ -111,7 +111,7 @@ plotMS <- function(motif_enrichment, motif = NULL, ...) {
     ggplot2::geom_point(shape = 21, size = 8, stroke = 1, na.rm = TRUE) +
     ggplot2::scale_fill_manual(values = c("G" = "#F5C714", "A" = "#70BF52", "C" = "#3D94D1", "U" = "#E0546C", "T" = "#E0546C")) +
     ggplot2::scale_x_continuous(breaks = 1:ncol(ms_matrix)) +
-    ggplot2::scale_y_continuous(limits = c(-0.05, 1.05), breaks = seq(0, 1, by = 0.2)) +
+    ggplot2::scale_y_continuous(limits = c(-0.05, 1.05), breaks = seq(0, 1, by = 0.2), trans = 'reverse') +
     ggplot2::labs(
       title = "Mutational Sensitivity Profile",
       subtitle = subtitle_text,

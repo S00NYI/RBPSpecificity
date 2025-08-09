@@ -32,7 +32,7 @@ returnMS <- function(motif_enrichment, motif = NULL, return_type = "specific",
 
   # --- Logic based on return_type ---
   if (return_type == "specific") {
-    # --- Calculate for a single motif (original logic) ---
+    # ... (The code to find and validate the target motif remains the same) ...
     if (!output_type %in% c("matrix", "number")) stop("'output_type' must be 'matrix' or 'number' for specific return.")
     if (is.null(motif) || motif == "top") {
       target_motif <- findTopMotif(motif_enrichment)
@@ -60,11 +60,15 @@ returnMS <- function(motif_enrichment, motif = NULL, return_type = "specific",
     snv_sensitivities <- calSNVSens(reference_score, variant_scores, method = sensitivity_method)
 
     if (output_type == "matrix") {
-      ms_matrix <- formatMS(snv_sensitivities, target_motif, kmer_size, nucleotides = nucleotides_used)
+      ms_matrix <- formatMS(snv_sensitivities, target_motif, reference_score, kmer_size,
+                            nucleotides = nucleotides_used, sensitivity_method = sensitivity_method)
       attr(ms_matrix, "motif_name") <- target_motif
       return(ms_matrix)
     } else { # "number"
-      return(mean(snv_sensitivities, na.rm = TRUE))
+      score_diff_sensitivities <- calSNVSens(reference_score, variant_scores, method = "score_diff")
+      non_zero_sensitivities <- score_diff_sensitivities[score_diff_sensitivities != 0]
+
+      return(mean(non_zero_sensitivities, na.rm = TRUE))
     }
 
   } else { # return_type == "all"
@@ -85,8 +89,9 @@ returnMS <- function(motif_enrichment, motif = NULL, return_type = "specific",
       variant_scores <- motif_enrichment$Score[variant_indices[valid_indices]]
 
       if (length(variant_scores) > 0) {
-        snv_sensitivities <- 1 - variant_scores # Using the default method directly for speed
-        ms_values[i] <- mean(snv_sensitivities, na.rm = TRUE)
+        score_diffs <- reference_score - variant_scores
+        non_zero_diffs <- score_diffs[score_diffs != 0]
+        ms_values[i] <- mean(non_zero_diffs, na.rm = TRUE)
       } else {
         ms_values[i] <- NA_real_
       }
@@ -157,7 +162,8 @@ calSNVSens <- function(reference_score, variant_scores, method = "1_minus_norm_s
 #' @return A matrix (rows=nucleotides, cols=positions 1 to K) with sensitivity scores.
 #'   The cell corresponding to the original nucleotide at a position might be NA or 0.
 #' @keywords internal
-formatMS <- function(snv_sensitivity_scores, reference_motif, K, nucleotides = c('A', 'C', 'G', 'T')) {
+formatMS <- function(snv_sensitivity_scores, reference_motif, reference_score, K,
+                     nucleotides = c('A', 'C', 'G', 'T'), sensitivity_method = "1_minus_norm_score") {
   # Initialize matrix (Nucs x Pos) with NAs
   ms_matrix <- matrix(NA_real_,
                       nrow = length(nucleotides),
@@ -169,9 +175,12 @@ formatMS <- function(snv_sensitivity_scores, reference_motif, K, nucleotides = c
   # Loop through each position and nucleotide to fill the matrix
   for (pos in 1:K) {
     for (nuc in nucleotides) {
-      # If this is the original nucleotide at this position, score is NA (no change)
+      # If this is the original nucleotide at this position
       if (nuc == ref_chars[pos]) {
-        ms_matrix[nuc, pos] <- NA_real_
+        # The "mutation" is to itself. Calculate sensitivity based on the chosen method.
+        # This makes the row for the reference nucleotide consistent.
+        self_sens <- calSNVSens(reference_score, reference_score, method = sensitivity_method)
+        ms_matrix[nuc, pos] <- self_sens
         next
       }
 

@@ -355,21 +355,18 @@ motifEnrichment <- function(peak_data,
 
   # --- 4. Enrichment and Normalization ---
   message("\n--- Phase 4: Calculating Final Enrichment Scores ---")
-  # Calculate background-corrected enrichment
-  enrichment_scores <- calEnrichment(
-    peak_kmer_counts_df = peak_kmer_counts,
-    avg_bkg_counts_df = bkg_kmer_counts,
-    method = enrichment_method
-  )
+  enrichment_scores <- calEnrichment(peak_kmer_counts_df = peak_kmer_counts, avg_bkg_counts_df = bkg_kmer_counts, method = enrichment_method)
   message("Calculated enrichment using '", enrichment_method, "' method.")
 
-  # Normalize the final scores
-  final_scores <- normalizeScores(
-    scores = enrichment_scores$EnrichmentScore,
-    method = normalization_method,
-    ...
-  )
-  message("Normalized final scores using '", normalization_method, "' method.")
+  if (log_transform) {
+    message("Applying log-transformation to scores (scaling to [1,e] then taking natural log).")
+    scores_scaled_to_exp <- normalizeScores(enrichment_scores$EnrichmentScore, method = "min_max", a = 1, b = exp(1))
+    final_scores <- log(scores_scaled_to_exp)
+  } else {
+    message("Applying direct '", normalization_method, "' normalization.")
+    # This is the old, direct normalization method
+    final_scores <- normalizeScores(scores = enrichment_scores$EnrichmentScore, method = normalization_method, ...)
+  }
 
   # --- 5. Return Final Data Frame ---
   results_df <- data.frame(

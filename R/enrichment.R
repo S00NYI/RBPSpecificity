@@ -260,6 +260,9 @@ calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
 #'   Supported: "subtract" (default), "fold_change", "log2_fold_change".
 #' @param normalization_method Character string, the method for normalizing the final
 #'   enrichment scores. Supported: "min_max" (default), "z_score", "log2", "none".
+#' @param log_transform Logical, if TRUE, applies a log transformation after scaling,
+#'   mimicking the original analysis script's method (min-max to [1,e] then log).
+#'   If FALSE, performs only the specified `normalization_method`. Default: TRUE.
 #' @param Bkg_number Integer, the number of background iterations to perform for averaging.
 #'   Default: 100.
 #' @param Bkg_dist Integer, the minimum distance (in base pairs) to shift peaks when
@@ -296,6 +299,7 @@ motifEnrichment <- function(peak_data,
                             extension = 0,
                             enrichment_method = "subtract",
                             normalization_method = "min_max",
+                            log_transform = TRUE,
                             Bkg_number = 100,
                             Bkg_dist = 500,
                             max_shift_dist = 1000,

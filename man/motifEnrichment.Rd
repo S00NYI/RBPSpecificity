@@ -11,6 +11,7 @@ motifEnrichment(
   extension = 0,
   enrichment_method = "subtract",
   normalization_method = "min_max",
+  log_transform = TRUE,
   Bkg_number = 100,
   Bkg_dist = 500,
   max_shift_dist = 1000,
@@ -35,6 +36,10 @@ Supported: "subtract" (default), "fold_change", "log2_fold_change".}
 
 \item{normalization_method}{Character string, the method for normalizing the final
 enrichment scores. Supported: "min_max" (default), "z_score", "log2", "none".}
+
+\item{log_transform}{Logical, if TRUE, applies a log transformation after scaling,
+mimicking the original analysis script's method (min-max to [1,e] then log).
+If FALSE, performs only the specified `normalization_method`. Default: TRUE.}
 
 \item{Bkg_number}{Integer, the number of background iterations to perform for averaging.
 Default: 100.}

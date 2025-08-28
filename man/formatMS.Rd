@@ -7,8 +7,10 @@
 formatMS(
   snv_sensitivity_scores,
   reference_motif,
+  reference_score,
   K,
-  nucleotides = c("A", "C", "G", "T")
+  nucleotides = c("A", "C", "G", "T"),
+  sensitivity_method = "1_minus_norm_score"
 )
 }
 \arguments{

@@ -32,7 +32,6 @@ returnMS <- function(motif_enrichment, motif = NULL, return_type = "specific",
 
   # --- Logic based on return_type ---
   if (return_type == "specific") {
-    # ... (The code to find and validate the target motif remains the same) ...
     if (!output_type %in% c("matrix", "number")) stop("'output_type' must be 'matrix' or 'number' for specific return.")
     if (is.null(motif) || motif == "top") {
       target_motif <- findTopMotif(motif_enrichment)
@@ -43,8 +42,11 @@ returnMS <- function(motif_enrichment, motif = NULL, return_type = "specific",
     kmer_size <- nchar(motif_enrichment$MOTIF[1])
     valInputMotif(motif = target_motif, kmer_size = kmer_size, available_motifs = motif_enrichment$MOTIF)
 
-    nucleotides_used <- if (grepl("U", target_motif)) c('A', 'C', 'G', 'U') else c('A', 'C', 'G', 'T')
-    all_variants <- genMotifVar(motif = target_motif, type = if('U' %in% nucleotides_used) "RNA" else "DNA")
+    is_rna_context <- any(grepl("U", motif_enrichment$MOTIF))
+    nucleotides_used <- if (is_rna_context) c('A', 'C', 'G', 'U') else c('A', 'C', 'G', 'T')
+    variant_type <- if (is_rna_context) "RNA" else "DNA"
+
+    all_variants <- genMotifVar(motif = target_motif, type = variant_type)
 
     reference_score <- motif_enrichment$Score[motif_enrichment$MOTIF == target_motif]
     variant_indices <- match(all_variants, motif_enrichment$MOTIF)
@@ -67,21 +69,23 @@ returnMS <- function(motif_enrichment, motif = NULL, return_type = "specific",
     } else { # "number"
       score_diff_sensitivities <- calSNVSens(reference_score, variant_scores, method = "score_diff")
       non_zero_sensitivities <- score_diff_sensitivities[score_diff_sensitivities != 0]
-
       return(mean(non_zero_sensitivities, na.rm = TRUE))
     }
 
   } else { # return_type == "all"
-    # --- Calculate for all motifs ---
     message("Calculating MS for all ", nrow(motif_enrichment), " motifs. This may take a while...")
+
+    is_rna_context <- any(grepl("U", motif_enrichment$MOTIF))
+    nucleotides_used <- if (is_rna_context) c('A', 'C', 'G', 'U') else c('A', 'C', 'G', 'T')
+    variant_type <- if (is_rna_context) "RNA" else "DNA"
+
     all_motifs <- motif_enrichment$MOTIF
     ms_values <- numeric(length(all_motifs))
     pb <- utils::txtProgressBar(min = 0, max = length(all_motifs), style = 3)
 
     for (i in seq_along(all_motifs)) {
       target_motif <- all_motifs[i]
-      nucleotides_used <- if (grepl("U", target_motif)) c('A', 'C', 'G', 'U') else c('A', 'C', 'G', 'T')
-      all_variants <- genMotifVar(motif = target_motif, type = if('U' %in% nucleotides_used) "RNA" else "DNA")
+      all_variants <- genMotifVar(motif = target_motif, type = variant_type)
 
       reference_score <- motif_enrichment$Score[i]
       variant_indices <- match(all_variants, all_motifs)

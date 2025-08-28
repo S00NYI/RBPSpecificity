@@ -4,27 +4,26 @@
 \alias{returnIS}
 \title{Calculate Inherent Specificity (IS)}
 \usage{
-returnIS(motif_enrichment, motif = NULL)
+returnIS(motif_enrichment, motif = NULL, return_type = "specific")
 }
 \arguments{
 \item{motif_enrichment}{A data frame containing motif enrichment scores,
-typically output from `motifEnrichment()`. Must have columns like 'MOTIF'
-and 'Score' (or 'Enrichment').}
+typically output from `motifEnrichment()`. Must have columns 'MOTIF'
+and 'Score'.}
 
 \item{motif}{Character string, the specific motif for which to calculate IS.
-If NULL or "top", the motif with the highest score is used (default: NULL).}
+Only used if `return_type = "specific"`. If NULL or "top", the top-scoring
+motif is used. Default: NULL.}
+
+\item{return_type}{Character string, either "specific" (default) or "all".
+If "specific", returns a single IS value for the target motif. If "all",
+returns a data frame with IS values for every motif.}
 }
 \value{
-A single numeric value representing the IS score for the motif.
+A single numeric IS value if `return_type = "specific"`, or a data
+  frame with 'MOTIF' and 'IS' columns if `return_type = "all"`.
 }
 \description{
 Calculates the Inherent Specificity (IS) for a given motif based
 on its enrichment score relative to the median enrichment score of all motifs.
-}
-\examples{
-\dontrun{
-# Assuming enrichment_results is output from motifEnrichment()
-is_value_top <- returnIS(enrichment_results)
-is_value_specific <- returnIS(enrichment_results, motif = "UGUGU")
-}
 }

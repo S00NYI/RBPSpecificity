@@ -7,38 +7,36 @@
 returnMS(
   motif_enrichment,
   motif = NULL,
+  return_type = "specific",
   output_type = "matrix",
   sensitivity_method = "1_minus_norm_score"
 )
 }
 \arguments{
-\item{motif_enrichment}{A data frame containing motif enrichment scores
-(output from `motifEnrichment()`). Requires 'MOTIF' and 'Score' columns.}
+\item{motif_enrichment}{A data frame with 'MOTIF' and 'Score' columns.}
 
-\item{motif}{Character string, the reference motif for which to calculate MS.
-If NULL or "top", the motif with the highest score is used (default: NULL).}
+\item{motif}{Character string, the reference motif. Only used if
+`return_type = "specific"`. If NULL or "top", the top-scoring motif is used.}
 
-\item{output_type}{Character string, specifying the output format:
-"matrix" returns a matrix of sensitivity scores for each SNV (Nucleotide x Position),
-"number" returns a single average sensitivity score across all SNVs (default: "matrix").}
+\item{return_type}{Character string, either "specific" (default) or "all".
+If "specific", calculates MS for one motif. If "all", calculates an
+average MS score for every motif.}
 
-\item{sensitivity_method}{Character string defining how sensitivity is calculated
-(e.g., "1_minus_norm_score", "score_diff", "log2_ratio") (default: "1_minus_norm_score").}
+\item{output_type}{Character string, specifying the output format if
+`return_type = "specific"`: "matrix" (default) or "number". Ignored if
+`return_type = "all"`.}
+
+\item{sensitivity_method}{Character string defining how sensitivity is calculated.
+Default: "1_minus_norm_score".}
 }
 \value{
-Depending on `output_type`:
-  - A matrix with nucleotides as rows and positions as columns, containing sensitivity scores.
-  - A single numeric value representing the average sensitivity score.
+Depends on inputs:
+  - If `return_type = "specific"` and `output_type = "matrix"`: An MS matrix.
+  - If `return_type = "specific"` and `output_type = "number"`: A single numeric MS score.
+  - If `return_type = "all"`: A data frame with 'MOTIF' and 'MS' columns.
 }
 \description{
-Calculates the Mutational Sensitivity (MS) for a target motif.
-MS reflects how much the enrichment score changes upon single nucleotide
-variations (SNVs) in the motif.
-}
-\examples{
-\dontrun{
-# Assuming enrichment_results is output from motifEnrichment()
-ms_matrix <- returnMS(enrichment_results, motif = "UGUGU", output_type = "matrix")
-ms_average <- returnMS(enrichment_results, motif = "UGUGU", output_type = "number")
-}
+Calculates the Mutational Sensitivity (MS) for a target motif or
+  for all motifs. MS reflects how much the enrichment score changes upon
+  single nucleotide variations (SNVs).
 }

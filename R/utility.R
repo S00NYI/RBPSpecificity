@@ -50,7 +50,7 @@ minmaxNorm <- function(x, a = 0, b = 1) {
 #'
 #' @return A DNAString object with shuffled nucleotides. Returns empty DNAString
 #'   if input is empty or NA.
-#' @importFrom Biostrings DNAString BString subject
+#' @importFrom Biostrings DNAString BString
 #' @importFrom methods is
 #' @keywords internal
 scrambleDNA <- function(seq) {
@@ -711,7 +711,7 @@ countKmers <- function(sequences, K, type = "DNA") {
 #'   could be generated.
 #'
 #' @importFrom GenomicRanges GRanges shift findOverlaps width
-#' @importFrom Biostrings DNAStringSet BString subject
+#' @importFrom Biostrings DNAStringSet BString
 #' @importFrom S4Vectors queryHits
 #' @importFrom methods is
 #'

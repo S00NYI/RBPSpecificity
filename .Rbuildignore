@@ -1,3 +1,4 @@
 ^RBPSpecificity\.Rcheck$
 ^alpha_build_test\.R$
 ^RBPSpecificity\.BiocCheck$
+^RBPSpecificity\.Rproj$

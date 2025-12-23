@@ -13,7 +13,6 @@ License: GPL-3
 Encoding: UTF-8
 biocViews: Software, MotifAnnotation, Sequencing, Coverage, GenomeAnnotation, Visualization, GeneRegulation
 BugReports: https://github.com/S00NYI/RBPSpecificity/issues
-
 URL:
     https://www.biorxiv.org/content/10.1101/2025.03.28.646018v2,
     https://github.com/S00NYI/RBPSpecificity,

@@ -163,7 +163,7 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
 #'
 #' @return A data frame with 'MOTIF' and 'EnrichmentScore' columns.
 #'
-#' @importFrom dplyr full_join select mutate arrange desc
+#' @importFrom dplyr full_join select mutate arrange desc %>%
 #' @keywords internal # Helper for the main motifEnrichment function
 calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
                           method = "subtract", pseudocount = 1) {

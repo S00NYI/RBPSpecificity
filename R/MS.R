@@ -184,12 +184,12 @@ formatMS <- function(snv_sensitivity_scores, reference_motif, reference_score, K
   ms_matrix <- matrix(NA_real_,
                       nrow = length(nucleotides),
                       ncol = K,
-                      dimnames = list(nucleotides, paste0("Pos", 1:K)))
+                      dimnames = list(nucleotides, paste0("Pos", seq_len(K))))
 
   ref_chars <- strsplit(reference_motif, "")[[1]]
 
   # Loop through each position and nucleotide to fill the matrix
-  for (pos in 1:K) {
+  for (pos in seq_len(K)) {
     for (nuc in nucleotides) {
       # If this is the original nucleotide at this position
       if (nuc == ref_chars[pos]) {

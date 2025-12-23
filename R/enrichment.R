@@ -278,7 +278,7 @@ calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
 #' @export
 #'
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # This is a conceptual example, as it requires real data and a BSgenome package.
 #' # Assume 'my_peak_df' is a data frame with chr, start, end columns.
 #'

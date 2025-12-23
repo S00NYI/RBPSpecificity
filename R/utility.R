@@ -381,7 +381,7 @@ peakParse <- function(input, standard_chroms_only = TRUE, keep_extra = TRUE) {
       stop("Failed to create GRanges object from data frame in peakParse.\n",
            "Ensure columns '", chr_col, "', '", start_col, "', '", end_col,
            "' (and optionally '", strand_col, "') are present and valid.\n",
-           "Original error: ", e$message)
+           conditionMessage(e), call. = FALSE)
     })
     # message("GRanges object created successfully from data frame in peakParse.")
   } else {

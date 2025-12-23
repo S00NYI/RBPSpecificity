@@ -1,0 +1,356 @@
+---
+title: "Introduction to RBPSpecificity"
+author: "Soon Yi"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to RBPSpecificity}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5,
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+# Overview
+
+**RBPSpecificity** provides tools to analyze RNA-Binding Protein (RBP) binding 
+specificities from high-throughput sequencing data. This package provides tools for:
+
+- Calculating **Inherent Specificity (IS)** from k-mer enrichment data
+- Calculating **Mutational Sensitivity (MS)** for top motifs
+- Visualizing specificity distributions and sensitivity profiles
+- Computing enrichment scores from CLIP peak data
+
+# Introduction
+
+## Background
+
+The package implements two key metrics for characterizing RBP binding behavior:
+
+1. **Inherent Specificity (IS)**: Quantifies how specifically an RBP binds its 
+   top motif relative to all other motifs. Higher IS indicates more specific binding.
+2. **Mutational Sensitivity (MS)**: Measures how much the binding affinity 
+   changes upon single nucleotide variations in the motif. Higher MS indicates
+   greater sensitivity to sequence changes.
+
+These metrics enable quantitative comparison of RBP binding properties across
+different experimental conditions or between different RBPs.
+
+## Reference
+
+For a detailed description of these metrics and their biological applications, 
+please refer to:
+
+> Yi S, Singh SS, Ye X, Krishna R, Jankowsky E, Luna JM. (2025). 
+> *Inherent Specificity and Mutational Sensitivity as Quantitative Metrics for RBP Binding.* 
+> bioRxiv. https://www.biorxiv.org/content/10.1101/2025.03.28.646018v2
+
+## Sample Data
+
+The sample data included in this package were obtained from the ENCODE portal 
+(Luo et al., 2020).
+
+### RBNS Data
+
+RNA Bind-n-Seq (RBNS) datasets provide in vitro RNA-RBP affinity measurements. 
+For each K-mer enrichment dataset, the RBP concentration generating the highest 
+R-value was selected as the representative sample. The collected RBNS R scores 
+were feature-scaled to [1, e] followed by natural log transformation to normalize 
+to a 0-to-1 scale.
+
+### eCLIP Data
+
+eCLIP datasets provide in vivo RBP binding site information. Peak coordinates 
+were extended 25 nucleotides upstream from the 5'-end. Motif enrichment was 
+calculated by counting K-mer appearances across extended peaks and subtracting 
+background counts from randomly shifted genomic regions (up to 500 nt away). 
+Background generation was repeated 100 times for robust averaging.
+
+> Luo Y, Hitz BC, Gabdank I, et al. (2020). New developments on the Encyclopedia 
+> of DNA Elements (ENCODE) data portal. *Nucleic Acids Res.* 48, D882–D889.
+
+# Setup
+
+```{r install, eval=FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("RBPSpecificity")
+```
+
+```{r load-package}
+library(RBPSpecificity)
+library(ggplot2)
+```
+
+# Pre-computed Enrichment Data (RBNS)
+
+This workflow demonstrates how to calculate IS and MS from pre-computed 
+enrichment scores, such as those from RBNS (RNA Bind-n-Seq) experiments.
+
+## Loading RBNS Data
+
+The sample data contains normalized 5-mer enrichment scores for two RBPs: 
+HNRNPC (high specificity) and EIF4G2 (low specificity).
+
+```{r load-rbns}
+# Load sample RBNS data from package
+rbns_file <- system.file("extdata", "RBNS_normalized_5mer.csv", 
+                          package = "RBPSpecificity")
+rbns_data <- read.csv(rbns_file, stringsAsFactors = FALSE)
+
+# Preview the data
+head(rbns_data)
+```
+
+## Preparing Data for Analysis
+
+The package expects a data.frame with `MOTIF` and `Score` columns:
+
+```{r prep-hnrnpc}
+# Prepare HNRNPC data
+hnrnpc_rbns <- data.frame(
+  MOTIF = rbns_data$Motif,
+  Score = rbns_data$HNRNPC
+)
+
+# Prepare EIF4G2 data
+eif4g2_rbns <- data.frame(
+  MOTIF = rbns_data$Motif,
+  Score = rbns_data$EIF4G2
+)
+```
+
+## Calculating Inherent Specificity (IS)
+
+IS is calculated as the ratio of the top motif's score to the median score:
+
+$$IS = \frac{Score_{top}}{Score_{median}}$$
+
+```{r calc-is}
+# Calculate IS for top motif (default)
+is_hnrnpc <- returnIS(hnrnpc_rbns)
+is_eif4g2 <- returnIS(eif4g2_rbns)
+
+message("HNRNPC IS: ", round(is_hnrnpc, 2))
+message("EIF4G2 IS: ", round(is_eif4g2, 2))
+```
+
+You can also calculate IS for all motifs:
+
+```{r calc-is-all}
+is_all <- returnIS(hnrnpc_rbns, return_type = "all")
+head(is_all[order(-is_all$IS), ], 10)
+```
+
+## Calculating Mutational Sensitivity (MS)
+
+MS quantifies how sensitive an RBP is to single nucleotide changes in its 
+preferred motif.
+
+```{r calc-ms}
+# Get MS as a matrix (shows sensitivity at each position)
+ms_matrix <- returnMS(hnrnpc_rbns, output_type = "matrix")
+print(ms_matrix)
+
+# Get MS as a single number (average sensitivity)
+ms_hnrnpc <- returnMS(hnrnpc_rbns, output_type = "number")
+ms_eif4g2 <- returnMS(eif4g2_rbns, output_type = "number")
+
+message("HNRNPC MS: ", round(ms_hnrnpc, 4))
+message("EIF4G2 MS: ", round(ms_eif4g2, 4))
+```
+
+## Visualization
+
+### IS Distribution Plot
+
+The `plotIS()` function displays the distribution of k-mer scores, highlighting 
+the top motif and its IS value:
+
+```{r plot-is-hnrnpc, fig.cap="Distribution of k-mer scores for HNRNPC (high specificity)."}
+plotIS(hnrnpc_rbns)
+```
+
+You can adjust the number of histogram bins with the `bins` parameter:
+
+```{r plot-is-eif4g2, fig.cap="Distribution of k-mer scores for EIF4G2 (low specificity) with 30 bins."}
+plotIS(eif4g2_rbns, bins = 30)
+```
+
+### MS Profile Plot
+
+The `plotMS()` function visualizes how sensitive binding is to mutations at each 
+position. Here we compare MS profiles for both RBPs:
+
+```{r plot-ms-hnrnpc, fig.cap="Mutational sensitivity profile for HNRNPC (high specificity RBP)."}
+plotMS(hnrnpc_rbns)
+```
+
+```{r plot-ms-eif4g2, fig.cap="Mutational sensitivity profile for EIF4G2 (low specificity RBP)."}
+plotMS(eif4g2_rbns)
+```
+
+# De Novo Enrichment from Peaks (eCLIP)
+
+This workflow demonstrates how to calculate enrichment scores directly from 
+peak data using the `motifEnrichment()` function.
+
+> **Note**: While this example uses eCLIP-derived peaks, `motifEnrichment()` 
+> works with any peak data in BED format (e.g., iCLIP, PAR-CLIP, or other 
+> ChIP-seq derived peaks).
+
+> **Requirement**: This workflow requires `BSgenome.Hsapiens.UCSC.hg38` to be installed.
+
+## Loading Peak Data
+
+```{r load-eclip}
+# Load sample eCLIP peaks (BED format) from package
+peaks_file <- system.file("extdata", "eCLIP_Peaks_HNRNPC.bed", 
+                           package = "RBPSpecificity")
+hnrnpc_peaks <- read.table(peaks_file, header = FALSE)
+colnames(hnrnpc_peaks) <- c("chr", "start", "end", "name", "score", "strand",
+                            "signalValue", "pValue", "qValue", "peak")
+
+message("Loaded ", nrow(hnrnpc_peaks), " HNRNPC eCLIP peaks.")
+```
+
+## Running motifEnrichment Pipeline
+
+In addition to standard input variables, `motifEnrichment()` provides several 
+parameters for customization:
+
+| Parameter | Description |
+|-----------|-------------|
+| `extension` | Number of base pairs to extend each peak from its 5'-end (upstream) |
+| `Bkg_number` | Number of background iterations for averaging (higher = more robust) |
+| `Bkg_dist` | Minimum distance (bp) to shift peaks when generating background regions |
+| `max_shift_dist` | Maximum distance (bp) for shifting peaks in background generation |
+| `log_transform` | If TRUE, applies log transformation after min-max scaling to [1, e] |
+
+The `log_transform` parameter controls the final score transformation:
+- When `TRUE` (default): Scores are first scaled to [1, e] using min-max 
+  normalization, then the natural logarithm is applied
+- When `FALSE`: Only the specified `normalization_method` is applied directly
+
+```{r run-enrichment, eval=FALSE}
+# NOTE: This requires BSgenome.Hsapiens.UCSC.hg38
+# Bkg_number is set low (10) for demo; use 100+ for real analysis
+
+hnrnpc_enrichment <- motifEnrichment(
+  peak_data = hnrnpc_peaks,
+  species_or_build = "hg38",
+  K = 5,
+  extension = 25,
+  Bkg_number = 10,
+  Bkg_dist = 500,
+  max_shift_dist = 1000,
+  log_transform = TRUE
+)
+
+# For comparison, also run on EIF4G2 peaks
+eif4g2_file <- system.file("extdata", "eCLIP_Peaks_EIF4G2.bed", 
+                            package = "RBPSpecificity")
+eif4g2_peaks <- read.table(eif4g2_file, header = FALSE)
+colnames(eif4g2_peaks) <- c("chr", "start", "end", "name", "score", "strand",
+                             "signalValue", "pValue", "qValue", "peak")
+
+eif4g2_enrichment <- motifEnrichment(
+  peak_data = eif4g2_peaks,
+  species_or_build = "hg38",
+  K = 5,
+  extension = 25,
+  Bkg_number = 10,
+  Bkg_dist = 500,
+  max_shift_dist = 1000,
+  log_transform = TRUE
+)
+
+# View top enriched motifs for each RBP
+head(hnrnpc_enrichment[order(-hnrnpc_enrichment$Score), ], 10)
+head(eif4g2_enrichment[order(-eif4g2_enrichment$Score), ], 10)
+```
+
+
+## Calculating Metrics from Enrichment
+
+```{r eclip-metrics, eval=FALSE}
+# Calculate IS and MS from enrichment data
+is_eclip_hnrnpc <- returnIS(hnrnpc_enrichment)
+ms_eclip_hnrnpc <- returnMS(hnrnpc_enrichment, output_type = "number")
+
+is_eclip_eif4g2 <- returnIS(eif4g2_enrichment)
+ms_eclip_eif4g2 <- returnMS(eif4g2_enrichment, output_type = "number")
+
+message("HNRNPC eCLIP - IS: ", round(is_eclip_hnrnpc, 2), ", MS: ", round(ms_eclip_hnrnpc, 4))
+message("EIF4G2 eCLIP - IS: ", round(is_eclip_eif4g2, 2), ", MS: ", round(ms_eclip_eif4g2, 4))
+```
+
+## Visualization
+
+```{r eclip-plots, eval=FALSE}
+# IS Distribution plots
+plotIS(hnrnpc_enrichment)
+plotIS(eif4g2_enrichment)
+
+# MS Profile plots
+plotMS(hnrnpc_enrichment)
+plotMS(eif4g2_enrichment)
+```
+
+# Comparing Multiple RBPs
+
+You can loop through multiple RBPs to build a comparison table:
+
+```{r multi-rbp}
+# Get list of RBPs from column names
+rbps <- colnames(rbns_data)[-1]  # Exclude 'Motif'
+
+# Build results table
+results <- data.frame(
+  RBP = rbps,
+  IS = NA_real_,
+  MS = NA_real_
+)
+
+for (i in seq_along(rbps)) {
+  temp_df <- data.frame(
+    MOTIF = rbns_data$Motif,
+    Score = rbns_data[[rbps[i]]]
+  )
+  results$IS[i] <- returnIS(temp_df)
+  results$MS[i] <- returnMS(temp_df, output_type = "number")
+}
+
+print(results)
+```
+
+# Comparing RBNS vs eCLIP
+
+A key application is comparing **inherent specificity** (from RBNS) with 
+**apparent specificity** (from eCLIP):
+
+```{r comparison, eval=FALSE}
+comparison <- data.frame(
+  Source = c("RBNS (Inherent)", "eCLIP (Apparent)"),
+  IS = c(is_hnrnpc, is_eclip),
+  MS = c(ms_hnrnpc, ms_eclip)
+)
+print(comparison)
+```
+
+# Session Info
+
+```{r session}
+sessionInfo()
+```

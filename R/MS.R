@@ -21,6 +21,18 @@
 #'   - If `return_type = "specific"` and `output_type = "number"`: A single numeric MS score.
 #'   - If `return_type = "all"`: A data frame with 'MOTIF' and 'MS' columns.
 #' @export
+#'
+#' @examples
+#' # Mock data with a motif (AAAAA) and some variants
+#' motifs <- c("AAAAA", "CAAAA", "GAAAA", "TAAAA", "ACAAA")
+#' scores <- c(100,     50,      40,      30,      60)
+#' df <- data.frame(MOTIF = motifs, Score = scores)
+#' 
+#' # Calculate MS matrix
+#' ms_mat <- returnMS(df, motif = "AAAAA", output_type = "matrix")
+#' 
+#' # Calculate average MS score
+#' ms_score <- returnMS(df, motif = "AAAAA", output_type = "number")
 returnMS <- function(motif_enrichment, motif = NULL, return_type = "specific",
                      output_type = "matrix", sensitivity_method = "1_minus_norm_score") {
   # --- Input Validation ---

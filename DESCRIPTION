@@ -1,7 +1,7 @@
 Package: RBPSpecificity
 Type: Package
 Title: RBP Inherent Specificity and Mutational Sensitivity Analysis Tool
-Version: 1.1.1
+Version: 0.99.0
 Description:
     Provides tools to analyze RNA Binding Protein (RBP) binding specificities
     from high-throughput sequencing data. Functions include calculating
@@ -9,20 +9,34 @@ Description:
     Sensitivity (MS), along with visualization of IS and MS.
     For detailed methodology and applications, please refer to our manuscript
     (see URL field or vignette).
-License: MIT + file LICENSE
+License: GPL-3
 Encoding: UTF-8
-LazyData: true
+biocViews: Software, MotifAnnotation, Sequencing, Coverage, GenomeAnnotation, Visualization, GeneRegulation
+BugReports: https://github.com/S00NYI/RBPSpecificity/issues
+
 URL:
     https://www.biorxiv.org/content/10.1101/2025.03.28.646018v2,
     https://github.com/S00NYI/RBPSpecificity,
-    https://github.com/S00NYI/Specificity_BITs
+    https://github.com/S00NYI/BITS_Specificity
 Authors@R: 
-    person("Soon", "Yi", , "cu.soonyi@gmail.com", role = c("aut", "cre"))
-RoxygenNote: 7.3.2
+    c(person("Soon", "Yi", , "cu.soonyi@gmail.com", role = c("aut", "cre"),
+             comment = c(ORCID = "0000-0002-4535-6532")),
+      person("National Institutes of Health", role = "fnd", comment = "T32 GM152319"))
+RoxygenNote: 7.3.3
 Imports: 
     Biostrings,
     BSgenome,
+    dplyr,
+    GenomeInfoDb,
     GenomicRanges,
     ggplot2,
     methods,
-    reshape2
+    reshape2,
+    S4Vectors,
+    stats,
+    utils
+Suggests: 
+    knitr,
+    rmarkdown,
+    testthat
+VignetteBuilder: knitr

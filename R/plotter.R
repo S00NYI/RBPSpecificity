@@ -9,6 +9,7 @@
 #'   (output from `motifEnrichment()`). Requires 'MOTIF' and 'Score' columns.
 #' @param motif Character string, the specific motif to highlight and calculate
 #'   IS for. If NULL or "top", the top-scoring motif is used (default: NULL).
+#' @param bins Integer, number of bins for the histogram (default: 50).
 #' @param ... Additional arguments passed to ggplot theme layers or geoms.
 #'
 #' @return A ggplot object representing the annotated histogram.
@@ -16,12 +17,18 @@
 #' @import ggplot2
 #'
 #' @examples
-#' \dontrun{
-#' # Assuming enrichment_results is output from motifEnrichment()
-#' plotIS(enrichment_results, motif = "UGUGU")
-#' plotIS(enrichment_results) # Uses top motif by default
-#' }
-plotIS <- function(motif_enrichment, motif = NULL, ...) {
+#' # Dummy data
+#' df <- data.frame(MOTIF = c("AAAA", "CCCC", "GGGG", "UUUU"), Score = c(10, 2, 5, 1))
+#' 
+#' # Plot specific motif
+#' plotIS(df, motif = "AAAA")
+#' 
+#' # Plot top motif (AAAA)
+#' plotIS(df)
+#' 
+#' # Change number of bins
+#' plotIS(df, bins = 20)
+plotIS <- function(motif_enrichment, motif = NULL, bins = 50, ...) {
   # 1. Validate input and find target motif
   if (!is.data.frame(motif_enrichment) || !all(c("MOTIF", "Score") %in% colnames(motif_enrichment))) {
     stop("'motif_enrichment' must be a data frame with 'MOTIF' and 'Score' columns.")
@@ -40,7 +47,7 @@ plotIS <- function(motif_enrichment, motif = NULL, ...) {
 
   # 3. Create the histogram using ggplot2
   plot <- ggplot2::ggplot(motif_enrichment, ggplot2::aes(x = Score)) +
-    ggplot2::geom_histogram(bins = 50, fill = "grey50", alpha = 0.7) +
+    ggplot2::geom_histogram(bins = bins, fill = "grey50", alpha = 0.7) +
     ggplot2::geom_vline(xintercept = median_score, color = "skyblue", linetype = "dashed", linewidth = 1) +
     ggplot2::geom_vline(xintercept = target_score, color = "salmon", linetype = "solid", linewidth = 1) +
     ggplot2::annotate("text", x = Inf, y = Inf, hjust = 1.1, vjust = 1.5,
@@ -51,7 +58,6 @@ plotIS <- function(motif_enrichment, motif = NULL, ...) {
       x = "Normalized Enrichment Score",
       y = "Frequency"
     ) +
-    ggplot2::theme_minimal() +
     ggplot2::theme_bw() +
     ggplot2::theme(axis.text = ggplot2::element_text(size=14),
                    axis.title = ggplot2::element_text(size=14, face = 'bold'),
@@ -78,10 +84,13 @@ plotIS <- function(motif_enrichment, motif = NULL, ...) {
 #' @importFrom reshape2 melt
 #'
 #' @examples
-#' \dontrun{
-#' # Assuming enrichment_results is output from motifEnrichment()
-#' plotMS(enrichment_results, motif = "UGUGU")
-#' }
+#' # Mock data with variants
+#' motifs <- c("AAAA", "CAAA", "GAAA", "TAAA")
+#' scores <- c(10,      5,      4,      3)
+#' df <- data.frame(MOTIF = motifs, Score = scores)
+#' 
+#' # Plot MS for "AAAA"
+#' plotMS(df, motif = "AAAA")
 plotMS <- function(motif_enrichment, motif = NULL, ...) {
   # 1. Get the MS matrix by calling returnMS
   ms_matrix <- returnMS(motif_enrichment, motif = motif, output_type = "matrix")
@@ -118,7 +127,6 @@ plotMS <- function(motif_enrichment, motif = NULL, ...) {
       x = "Position in Motif",
       y = "Mutational Sensitivity (1 - Variant Score)"
     ) +
-    ggplot2::theme_minimal() +
     ggplot2::theme_bw() +
     ggplot2::theme(axis.text = ggplot2::element_text(size=14),
                    axis.title = ggplot2::element_text(size=14, face = 'bold'),

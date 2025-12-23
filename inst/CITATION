@@ -1,0 +1,17 @@
+citHeader("To cite package 'RBPSpecificity' in publications use:")
+
+citEntry(entry = "Article",
+  title        = "Inherent Specificity and Mutational Sensitivity as Quantitative Metrics for RBP Binding",
+  author       = personList(
+    as.person("Soon Yi"),
+    as.person("Shashi S. Singh"),
+    as.person("Xuan Ye"),
+    as.person("Rohan Krishna"),
+    as.person("Eckhard Jankowsky"),
+    as.person("Joseph M. Luna")
+  ),
+  year         = "2025",
+  journal      = "bioRxiv",
+  doi          = "10.1101/2025.03.28.646018v2",
+  textVersion  = "Soon Yi, Shashi S. Singh, Xuan Ye, Rohan Krishna, Eckhard Jankowsky, Joseph M. Luna (2025). Inherent Specificity and Mutational Sensitivity as Quantitative Metrics for RBP Binding. bioRxiv. doi:10.1101/2025.03.28.646018v2"
+)

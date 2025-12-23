@@ -16,7 +16,7 @@ assess the inherent specificity (IS) and the mutational sensitivity (MS) of
 RBP towards the target motifs. The package aims to streamline bioinformatic
 analyses and provide clear visualizations for interpreting RBP specificity.
 
-**Note:** This package is under active development/development.
+**Note:** This package is under active development.
 }
 \section{Key Functions}{
 

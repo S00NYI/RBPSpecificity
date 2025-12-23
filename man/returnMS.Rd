@@ -40,3 +40,15 @@ Calculates the Mutational Sensitivity (MS) for a target motif or
   for all motifs. MS reflects how much the enrichment score changes upon
   single nucleotide variations (SNVs).
 }
+\examples{
+# Mock data with a motif (AAAAA) and some variants
+motifs <- c("AAAAA", "CAAAA", "GAAAA", "TAAAA", "ACAAA")
+scores <- c(100,     50,      40,      30,      60)
+df <- data.frame(MOTIF = motifs, Score = scores)
+
+# Calculate MS matrix
+ms_mat <- returnMS(df, motif = "AAAAA", output_type = "matrix")
+
+# Calculate average MS score
+ms_score <- returnMS(df, motif = "AAAAA", output_type = "number")
+}

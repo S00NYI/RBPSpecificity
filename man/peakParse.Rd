@@ -12,9 +12,6 @@ File path input is not yet supported by this helper.}
 
 \item{keep_extra}{Logical, if TRUE, keep additional metadata columns when converting
 data frame to GRanges (default: TRUE).}
-
-\item{required_cols}{Character vector of essential column names expected if input is a data frame
-(default: c("chr", "start", "end")). Common alternatives like "seqnames" are handled.}
 }
 \value{
 A GRanges object representing the peaks.

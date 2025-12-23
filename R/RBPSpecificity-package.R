@@ -11,7 +11,7 @@
 #' RBP towards the target motifs. The package aims to streamline bioinformatic
 #' analyses and provide clear visualizations for interpreting RBP specificity.
 #'
-#' **Note:** This package is under active development/development.
+#' **Note:** This package is under active development.
 #'
 #' @section Key Functions:
 #' The main workflow of the package revolves around the following exported functions:
@@ -33,6 +33,12 @@
 #'   \item Report bugs at \url{https://github.com/S00NYI/RBPSpecificity/issues}
 #' }
 "_PACKAGE" # Document this special string directly
+
+# Suppress R CMD check notes for NSE variables
+utils::globalVariables(c(
+  "COUNT", "AVG_BKG_COUNT", "MOTIF", "EnrichmentScore", "Score", 
+  "Sensitivity", "Nucleotide", "."
+))
 
 ## usethis namespace: start
 ## usethis namespace: end

@@ -1,3 +1,2 @@
-^.*\.Rproj$
-^\.Rproj\.user$
-^LICENSE\.md$
+^RBPSpecificity\.Rcheck$
+^alpha_build_test\.R$

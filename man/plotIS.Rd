@@ -4,7 +4,7 @@
 \alias{plotIS}
 \title{Plot Inherent Specificity (IS) Distribution}
 \usage{
-plotIS(motif_enrichment, motif = NULL, ...)
+plotIS(motif_enrichment, motif = NULL, bins = 50, ...)
 }
 \arguments{
 \item{motif_enrichment}{A data frame containing motif enrichment scores
@@ -12,6 +12,8 @@ plotIS(motif_enrichment, motif = NULL, ...)
 
 \item{motif}{Character string, the specific motif to highlight and calculate
 IS for. If NULL or "top", the top-scoring motif is used (default: NULL).}
+
+\item{bins}{Integer, number of bins for the histogram (default: 50).}
 
 \item{...}{Additional arguments passed to ggplot theme layers or geoms.}
 }
@@ -23,9 +25,15 @@ Generates a histogram of motif enrichment scores, annotated with
 the median score, the score of a specific motif, and its IS value.
 }
 \examples{
-\dontrun{
-# Assuming enrichment_results is output from motifEnrichment()
-plotIS(enrichment_results, motif = "UGUGU")
-plotIS(enrichment_results) # Uses top motif by default
-}
+# Dummy data
+df <- data.frame(MOTIF = c("AAAA", "CCCC", "GGGG", "UUUU"), Score = c(10, 2, 5, 1))
+
+# Plot specific motif
+plotIS(df, motif = "AAAA")
+
+# Plot top motif (AAAA)
+plotIS(df)
+
+# Change number of bins
+plotIS(df, bins = 20)
 }

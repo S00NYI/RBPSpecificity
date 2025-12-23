@@ -82,7 +82,7 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
   message("Generating average background K-mer profile over ", Bkg_number, " iterations:")
   pb <- utils::txtProgressBar(min = 0, max = Bkg_number, style = 3)
 
-  for (i in 1:Bkg_number) {
+  for (i in seq_len(Bkg_number)) {
     # Generate one set of scrambled background sequences
     # K for generateBkgSet is its internal min_length for getSequence
     one_bkg_dna_set <- generateBkgSet(
@@ -119,7 +119,7 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
   close(pb)
 
   if (valid_iterations_count == 0 && Bkg_number > 0) {
-    message("\nWarning: No valid background sequences yielded counts across any of the ", Bkg_number, " iterations. ",
+    message("\nNOTE: No valid background sequences yielded counts across any of the ", Bkg_number, " iterations. ",
             "Average background counts will be all zeros.")
     # The matrix is already initialized with zeros, so rowMeans will be 0.
   } else if (Bkg_number > 0) {
@@ -163,7 +163,7 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
 #'
 #' @return A data frame with 'MOTIF' and 'EnrichmentScore' columns.
 #'
-#' @importFrom dplyr inner_join select mutate arrange desc
+#' @importFrom dplyr full_join select mutate arrange desc
 #' @keywords internal # Helper for the main motifEnrichment function
 calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
                           method = "subtract", pseudocount = 1) {

@@ -175,7 +175,7 @@ genMotifVar <- function(motif, type = 'DNA') {
   original_chars <- strsplit(motif, "")[[1]]
 
   # Loop through each position
-  for (i in 1:motif_len) {
+  for (i in seq_len(motif_len)) {
     # Loop through each possible nucleotide
     for (nuc in nucleotides) {
       # If the nucleotide is different from the original at this position
@@ -329,8 +329,7 @@ selectGenome <- function(species_or_build) {
 #'
 #' @param input Can be a data frame (with chr, start, end columns), or a GRanges object.
 #'   File path input is not yet supported by this helper.
-#' @param required_cols Character vector of essential column names expected if input is a data frame
-#'   (default: c("chr", "start", "end")). Common alternatives like "seqnames" are handled.
+
 #' @param keep_extra Logical, if TRUE, keep additional metadata columns when converting
 #'   data frame to GRanges (default: TRUE).
 #'

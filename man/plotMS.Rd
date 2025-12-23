@@ -24,8 +24,11 @@ Visualizes the mutational sensitivity scores for a motif,
 typically showing sensitivity to SNVs at each position.
 }
 \examples{
-\dontrun{
-# Assuming enrichment_results is output from motifEnrichment()
-plotMS(enrichment_results, motif = "UGUGU")
-}
+# Mock data with variants
+motifs <- c("AAAA", "CAAA", "GAAA", "TAAA")
+scores <- c(10,      5,      4,      3)
+df <- data.frame(MOTIF = motifs, Score = scores)
+
+# Plot MS for "AAAA"
+plotMS(df, motif = "AAAA")
 }

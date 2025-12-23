@@ -1,8 +1,32 @@
-.DS_Store
-.Rproj.user
+# R-specific
 .Rhistory
+.Rdata
 .RData
 .Ruserdata
-*.DS_Store
+.Rproj.user/
+
+# macOS
+.DS_Store
 **/.DS_Store
 
+# Generated files (not needed in repo)
+*.html
+*.pdf
+
+# Test output files
+test_res_*.json
+test_res_*.csv
+
+# IDE
+.vscode/
+*.swp
+
+# Build artifacts
+*.tar.gz
+*.Rcheck/
+*.BiocCheck/
+
+# Vignette build artifacts
+vignettes/*.R
+vignettes/*.html
+vignettes/*_files/

@@ -18,6 +18,16 @@
 #' @return A single numeric IS value if `return_type = "specific"`, or a data
 #'   frame with 'MOTIF' and 'IS' columns if `return_type = "all"`.
 #' @export
+#'
+#' @examples
+#' # Create a dummy enrichment dataframe
+#' df <- data.frame(MOTIF = c("AAAAA", "CCCCC", "GGGGG"), Score = c(10, 2, 5))
+#' 
+#' # Calculate IS for a specific motif
+#' returnIS(df, motif = "AAAAA")
+#' 
+#' # Calculate IS for all motifs
+#' returnIS(df, return_type = "all")
 returnIS <- function(motif_enrichment, motif = NULL, return_type = "specific") {
   # --- Input Validation ---
   if (!is.data.frame(motif_enrichment) || !all(c("MOTIF", "Score") %in% colnames(motif_enrichment))) {

@@ -27,3 +27,13 @@ A single numeric IS value if `return_type = "specific"`, or a data
 Calculates the Inherent Specificity (IS) for a given motif based
 on its enrichment score relative to the median enrichment score of all motifs.
 }
+\examples{
+# Create a dummy enrichment dataframe
+df <- data.frame(MOTIF = c("AAAAA", "CCCCC", "GGGGG"), Score = c(10, 2, 5))
+
+# Calculate IS for a specific motif
+returnIS(df, motif = "AAAAA")
+
+# Calculate IS for all motifs
+returnIS(df, return_type = "all")
+}

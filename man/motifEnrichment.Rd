@@ -76,7 +76,7 @@ The workflow proceeds as follows:
 7.  Normalizes the final enrichment scores to a standard scale.
 }
 \examples{
-\donttest{
+\dontrun{
 # This is a conceptual example, as it requires real data and a BSgenome package.
 # Assume 'my_peak_df' is a data frame with chr, start, end columns.
 

@@ -39,7 +39,6 @@
 countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
                           Bkg_dist = 500, Bkg_number = 100, max_shift_dist = 1000,
                           internal_min_length_for_bkg_seqs = K) {
-
   # Input Validation for parameters specific to this function
   if (!methods::is(original_peak_gr, "GRanges") || length(original_peak_gr) == 0) {
     stop("'original_peak_gr' must be a non-empty GRanges object.")
@@ -50,12 +49,14 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
     stop("'Bkg_number' must be a single positive integer.")
   }
   if (!is.numeric(internal_min_length_for_bkg_seqs) || length(internal_min_length_for_bkg_seqs) != 1 ||
-      internal_min_length_for_bkg_seqs < 1 || internal_min_length_for_bkg_seqs %% 1 != 0) {
+    internal_min_length_for_bkg_seqs < 1 || internal_min_length_for_bkg_seqs %% 1 != 0) {
     stop("'internal_min_length_for_bkg_seqs' must be a single positive integer.")
   }
   if (internal_min_length_for_bkg_seqs < K) {
-    warning("'internal_min_length_for_bkg_seqs' (", internal_min_length_for_bkg_seqs,
-            ") is less than K (", K, "). Background sequences might be too short for K-mer counting.")
+    warning(
+      "'internal_min_length_for_bkg_seqs' (", internal_min_length_for_bkg_seqs,
+      ") is less than K (", K, "). Background sequences might be too short for K-mer counting."
+    )
   }
 
   message("Note: During background generation, any regions shorter than K=", K, " will be removed.")
@@ -73,9 +74,10 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
   # Rows: K-mers, Columns: Iterations
   # Initialize with 0s. dimnames ensures row order matches all_kmers_vector.
   counts_accumulator_matrix <- matrix(0L,
-                                      nrow = length(all_kmers_vector),
-                                      ncol = Bkg_number,
-                                      dimnames = list(all_kmers_vector, NULL))
+    nrow = length(all_kmers_vector),
+    ncol = Bkg_number,
+    dimnames = list(all_kmers_vector, NULL)
+  )
 
   valid_iterations_count <- 0 # Track iterations that yielded actual sequences for counting
 
@@ -104,7 +106,7 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
       # (countKmers should always return them in a consistent order based on expand.grid)
       if (identical(iter_counts_df$MOTIF, all_kmers_vector)) {
         counts_accumulator_matrix[, i] <- iter_counts_df$COUNT
-        if(sum(iter_counts_df$COUNT) > 0) { # Consider an iteration valid if it produced any counts
+        if (sum(iter_counts_df$COUNT) > 0) { # Consider an iteration valid if it produced any counts
           valid_iterations_count <- valid_iterations_count + 1
         }
       } else {
@@ -119,12 +121,16 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
   close(pb)
 
   if (valid_iterations_count == 0 && Bkg_number > 0) {
-    message("\nNOTE: No valid background sequences yielded counts across any of the ", Bkg_number, " iterations. ",
-            "Average background counts will be all zeros.")
+    message(
+      "\nNOTE: No valid background sequences yielded counts across any of the ", Bkg_number, " iterations. ",
+      "Average background counts will be all zeros."
+    )
     # The matrix is already initialized with zeros, so rowMeans will be 0.
   } else if (Bkg_number > 0) {
-    message("\nBackground profile generated. Averaged over ", valid_iterations_count,
-            " iterations that yielded sequences with K-mer counts.")
+    message(
+      "\nBackground profile generated. Averaged over ", valid_iterations_count,
+      " iterations that yielded sequences with K-mer counts."
+    )
   }
 
 
@@ -167,7 +173,6 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
 #' @keywords internal # Helper for the main motifEnrichment function
 calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
                           method = "subtract", pseudocount = 1) {
-
   # Input Validation
   if (!is.data.frame(peak_kmer_counts_df) || !all(c("MOTIF", "COUNT") %in% colnames(peak_kmer_counts_df))) {
     stop("'peak_kmer_counts_df' must be a data frame with 'MOTIF' and 'COUNT' columns.")
@@ -204,8 +209,7 @@ calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
   merged_counts$AVG_BKG_COUNT[is.na(merged_counts$AVG_BKG_COUNT)] <- 0
 
 
-  enriched_df <- switch(
-    method_upper,
+  enriched_df <- switch(method_upper,
     "SUBTRACT" = {
       merged_counts %>%
         dplyr::mutate(EnrichmentScore = COUNT - AVG_BKG_COUNT) %>%
@@ -221,8 +225,10 @@ calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
         dplyr::mutate(EnrichmentScore = log2((COUNT + pseudocount) / (AVG_BKG_COUNT + pseudocount))) %>%
         dplyr::select(MOTIF, EnrichmentScore)
     },
-    stop("Unsupported enrichment 'method': ", method,
-         ". Supported methods are 'subtract', 'fold_change', 'log2_fold_change'.")
+    stop(
+      "Unsupported enrichment 'method': ", method,
+      ". Supported methods are 'subtract', 'fold_change', 'log2_fold_change'."
+    )
   )
 
   # Optionally, arrange by score
@@ -278,7 +284,7 @@ calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
 #' @export
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # This is a conceptual example, as it requires real data and a BSgenome package.
 #' # Assume 'my_peak_df' is a data frame with chr, start, end columns.
 #'
@@ -305,7 +311,6 @@ motifEnrichment <- function(peak_data,
                             max_shift_dist = 1000,
                             nucleic_acid_type = "DNA",
                             ...) {
-
   # --- 1. Input Validation and Setup ---
   message("--- Phase 1: Initializing and Validating Inputs ---")
   if (missing(peak_data) || missing(species_or_build) || missing(K)) {

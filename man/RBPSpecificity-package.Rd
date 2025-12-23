@@ -33,7 +33,8 @@ The main workflow of the package revolves around the following exported function
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/S00NYI/RBPSpecificity} (Development repository)
+  \item \url{https://github.com/S00NYI/RBPSpecificity}
+        (Development repository)
   \item Report bugs at \url{https://github.com/S00NYI/RBPSpecificity/issues}
 }
 }

@@ -29,14 +29,15 @@
 #' @seealso
 #' Useful links:
 #' \itemize{
-#'   \item \url{https://github.com/S00NYI/RBPSpecificity} (Development repository)
+#'   \item \url{https://github.com/S00NYI/RBPSpecificity}
+#'         (Development repository)
 #'   \item Report bugs at \url{https://github.com/S00NYI/RBPSpecificity/issues}
 #' }
 "_PACKAGE" # Document this special string directly
 
 # Suppress R CMD check notes for NSE variables
 utils::globalVariables(c(
-  "COUNT", "AVG_BKG_COUNT", "MOTIF", "EnrichmentScore", "Score", 
+  "COUNT", "AVG_BKG_COUNT", "MOTIF", "EnrichmentScore", "Score",
   "Sensitivity", "Nucleotide", "."
 ))
 

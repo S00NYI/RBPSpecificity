@@ -2,34 +2,35 @@
 % Please edit documentation in R/enrichment.R
 \name{motifEnrichment}
 \alias{motifEnrichment}
-\title{Calculate K-mer Motif Enrichment from Peak Data}
+\title{Calculate K-mer Motif Enrichment from Genomic Coordinates}
 \usage{
 motifEnrichment(
-  peak_data,
+  coordinates,
   species_or_build,
   K,
-  extension = 0,
+  extension = c(0, 0),
   enrichment_method = "subtract",
   normalization_method = "min_max",
   log_transform = TRUE,
-  Bkg_number = 100,
-  Bkg_dist = 500,
-  max_shift_dist = 1000,
+  bkg_iter = 100,
+  bkg_min_dist = 500,
+  bkg_max_dist = 1000,
   nucleic_acid_type = "DNA",
   ...
 )
 }
 \arguments{
-\item{peak_data}{A data frame or GRanges object containing peak data. If a
-data frame, it must contain columns for chromosome, start, and end coordinates.}
+\item{coordinates}{A data frame or GRanges object containing genomic coordinates.
+If a data frame, it must contain columns for chromosome, start, and end.}
 
 \item{species_or_build}{Character string identifying the genome build (e.g.,
 "hg38", "mm10"). This is used to load the appropriate BSgenome package.}
 
 \item{K}{Integer, the length of the K-mers to analyze (e.g., 5).}
 
-\item{extension}{Integer, the number of base pairs to extend each peak from its
-5'-end (upstream). Default: 0.}
+\item{extension}{A numeric vector of length 2: `c(five_prime, three_prime)`.
+Positive values extend, negative values trim. Extension/trimming is strand-aware.
+Default: `c(0, 0)` (no change).}
 
 \item{enrichment_method}{Character string, the method for calculating enrichment.
 Supported: "subtract" (default), "fold_change", "log2_fold_change".}
@@ -41,13 +42,13 @@ enrichment scores. Supported: "min_max" (default), "z_score", "log2", "none".}
 mimicking the original analysis script's method (min-max to [1,e] then log).
 If FALSE, performs only the specified `normalization_method`. Default: TRUE.}
 
-\item{Bkg_number}{Integer, the number of background iterations to perform for averaging.
+\item{bkg_iter}{Integer, the number of background iterations to perform for averaging.
 Default: 100.}
 
-\item{Bkg_dist}{Integer, the minimum distance (in base pairs) to shift peaks when
+\item{bkg_min_dist}{Integer, the minimum distance (in base pairs) to shift peaks when
 creating background regions. Default: 500.}
 
-\item{max_shift_dist}{Integer, the maximum distance for shifting peaks. Default: 1000.}
+\item{bkg_max_dist}{Integer, the maximum distance for shifting peaks. Default: 1000.}
 
 \item{nucleic_acid_type}{Character string, "DNA" or "RNA". Determines the alphabet
 for K-mer generation. Default: "DNA".}
@@ -66,9 +67,9 @@ background-corrected enrichment scores for all K-mers of a given length.
 }
 \details{
 The workflow proceeds as follows:
-1.  Parses input peak data into a standardized GRanges object.
+1.  Parses input coordinate data into a standardized GRanges object.
 2.  Loads the specified BSgenome object for sequence retrieval.
-3.  Extracts sequences for peak regions, applying an optional 5'-end extension.
+3.  Extracts sequences for peak regions, applying optional extension/trimming.
 4.  Counts K-mers within the peak sequences.
 5.  Generates an averaged K-mer profile from multiple background sets. Background
     sets are created by shifting and scrambling genomic regions.
@@ -78,13 +79,13 @@ The workflow proceeds as follows:
 \examples{
 \dontrun{
 # This is a conceptual example, as it requires real data and a BSgenome package.
-# Assume 'my_peak_df' is a data frame with chr, start, end columns.
+# Assume 'my_coords_df' is a data frame with chr, start, end columns.
 
 enrichment_results <- motifEnrichment(
-  peak_data = my_peak_df,
+  coordinates = my_coords_df,
   species_or_build = "hg38",
   K = 5,
-  extension = 25,
+  extension = c(25, 0),  # Extend 25nt from 5'-end only
   enrichment_method = "subtract",
   normalization_method = "min_max"
 )

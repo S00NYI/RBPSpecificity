@@ -99,3 +99,106 @@ test_that("normalizeScores 'none' returns original values", {
   
   expect_equal(result, input)
 })
+
+# ------------------------------------------------------------------------------
+# Tests for getSequence (Internal Function)
+# ------------------------------------------------------------------------------
+
+# Note: getSequence is internal, so we access it if needed, but testthat usually runs in the pkg env.
+# We need a BSgenome object. We'll use BSgenome.Hsapiens.UCSC.hg38 as it is available.
+if (requireNamespace("BSgenome.Hsapiens.UCSC.hg38", quietly = TRUE)) {
+  hg38 <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
+  
+  test_that("getSequence handles bidirectional extension (c(X, Y)) correctly on + strand", {
+    # Create a 10bp range on chr1 + strand
+    # chr1: 100-109 (width 10)
+    gr <- GenomicRanges::GRanges(seqnames = "chr1", ranges = IRanges::IRanges(start = 100, end = 109), strand = "+")
+    
+    # Extend 5' by 5, 3' by 10
+    # Expected: 5' (start) - 5 = 95
+    # Expected: 3' (end) + 10 = 119
+    # Final width: 119 - 95 + 1 = 25
+    seqs <- getSequence(gr, hg38, extension = c(5, 10), min_length = 1)
+    
+    expect_equal(Biostrings::width(seqs), 25)
+  })
+  
+  test_that("getSequence handles bidirectional extension correctly on - strand", {
+    # Create a 10bp range on chr1 - strand
+    # chr1: 100-109 (width 10)
+    # 5' end is at 109, 3' end is at 100
+    gr <- GenomicRanges::GRanges(seqnames = "chr1", ranges = IRanges::IRanges(start = 100, end = 109), strand = "-")
+    
+    # Extend 5' by 5, 3' by 10
+    # Expected: 5' (end) + 5 = 114 (new end)
+    # Expected: 3' (start) - 10 = 90 (new start)
+    # Final width: 114 - 90 + 1 = 25
+    seqs <- getSequence(gr, hg38, extension = c(5, 10), min_length = 1)
+    
+    expect_equal(Biostrings::width(seqs), 25)
+  })
+  
+  test_that("getSequence handles trimming (negative extension)", {
+    # Create a 20bp range
+    gr <- GenomicRanges::GRanges(seqnames = "chr1", ranges = IRanges::IRanges(start = 100, end = 119), strand = "+")
+    
+    # Trim 5' by 2, 3' by 3
+    # Expected: start + 2 = 102
+    # Expected: end - 3 = 116
+    # Final width: 116 - 102 + 1 = 15
+    seqs <- getSequence(gr, hg38, extension = c(-2, -3), min_length = 1)
+    
+    expect_equal(Biostrings::width(seqs), 15)
+  })
+  
+  test_that("getSequence filters ranges shorter than min_length", {
+    # Create two ranges
+    # gr1: 10bp
+    # gr2: 10bp
+    gr <- GenomicRanges::GRanges(
+      seqnames = "chr1",
+      ranges = IRanges::IRanges(start = c(100, 200), width = 10),
+      strand = "+"
+    )
+    
+    # Trim both by 8bp total (4 from each side) -> width 2
+    # Set min_length = 5.
+    # Result: both should be removed.
+    
+    expect_message(
+      seqs <- getSequence(gr, hg38, extension = c(-4, -4), min_length = 5),
+      "ranges removed due to final length < 5"
+    )
+    
+    expect_equal(length(seqs), 0)
+    
+    # Try one valid, one invalid
+    # gr1: 10bp -> becomes 2bp (invalid)
+    # gr2: 20bp -> becomes 12bp (valid)
+    gr2 <- GenomicRanges::GRanges(
+      seqnames = "chr1",
+      ranges = IRanges::IRanges(start = c(100, 200), width = c(10, 20)),
+      strand = "+"
+    )
+    
+    expect_message(
+      seqs2 <- getSequence(gr2, hg38, extension = c(-4, -4), min_length = 5),
+      "1 ranges removed due to final length < 5"
+    )
+    
+    expect_equal(length(seqs2), 1)
+    # If the second one is kept, its width: 20 -> 20 - 4 - 4 = 12
+    expect_equal(Biostrings::width(seqs2), 12)
+  })
+  
+  test_that("getSequence handles c(0,0) (no change)", {
+    gr <- GenomicRanges::GRanges(seqnames = "chr1", ranges = IRanges::IRanges(start = 100, width = 10), strand = "+")
+    seqs <- getSequence(gr, hg38, extension = c(0, 0))
+    expect_equal(Biostrings::width(seqs), 10)
+  })
+  
+  test_that("getSequence errors on invalid extension input", {
+     gr <- GenomicRanges::GRanges(seqnames = "chr1", ranges = IRanges::IRanges(start = 100, width = 10), strand = "+")
+     expect_error(getSequence(gr, hg38, extension = 5), "'extension' must be a numeric vector of length 2")
+  })
+}

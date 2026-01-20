@@ -424,23 +424,23 @@ peakParse <- function(input, standard_chroms_only = TRUE, keep_extra = TRUE) {
 #' Get Sequences from GRanges
 #'
 #' @description Extracts DNA sequences for a set of genomic ranges from a
-#'   BSgenome object. Optionally extends ranges from their 5'-end, filters by
-#'   minimum length, and ensures ranges are valid within chromosome boundaries.
-#'   Original metadata columns (`mcols`) and names from the input `granges_obj`
-#'   are preserved for the ranges that successfully yield sequences.
+#'   BSgenome object. Optionally extends or trims ranges from their 5'-end
+#'   and/or 3'-end in a strand-aware manner, filters by minimum length, and
+#'   ensures ranges are valid within chromosome boundaries. Original metadata
+#'   columns (`mcols`) and names from the input `granges_obj` are preserved
+#'   for the ranges that successfully yield sequences.
 #'
 #' @param granges_obj A GRanges object.
 #' @param genome_obj A BSgenome object.
-#' @param extension Integer, number of base pairs to extend each range from its
-#'   5'-end (upstream). Positive values extend, negative values shorten from
-#'   the 5'-end, keeping the 3'-end fixed. Default: 0 (no change).
-#' @param resize_fix Character string, determines which part of the original range
-#'   is anchored when applying the `extension`. For 5'-end extension, "end"
-#'   (default) anchors the 3'-end of the original range. "start" would anchor
-#'   the 5'-end (extending the 3'-end), and "center" expands/contracts from
-#'   the center. This is passed to `GenomicRanges::resize()`.
+#' @param extension A numeric vector of length 2: `c(five_prime, three_prime)`.
+#'   Positive values extend the range, negative values trim the range.
+#'   Extension/trimming is strand-aware:
+#'   - For + strand (and * strand): 5'-end is start, 3'-end is end
+#'   - For - strand: 5'-end is end, 3'-end is start
+#'   Default: `c(0, 0)` (no change).
 #' @param min_length Integer, the minimum acceptable length of a range after
-#'   any resizing. Ranges shorter than this will be removed. Default: 1.
+#'   any extension/trimming. Ranges shorter than this will be removed.
+#'   Default: 1.
 #'
 #' @return A DNAStringSet object containing the extracted sequences. Names of the
 #'   sequences in the set will correspond to the names of the processed GRanges
@@ -449,12 +449,12 @@ peakParse <- function(input, standard_chroms_only = TRUE, keep_extra = TRUE) {
 #'   extraction. Returns an empty DNAStringSet if input `granges_obj` is empty
 #'   or if all ranges are filtered out.
 #' @importFrom Biostrings getSeq DNAStringSet
-#' @importFrom GenomicRanges GRanges resize width strand seqnames trim
+#' @importFrom GenomicRanges GRanges width strand seqnames trim start end start<- end<-
 #' @importFrom GenomeInfoDb seqlengths<- seqlevels seqlevelsInUse keepSeqlevels seqlengths
 #' @importFrom S4Vectors mcols mcols<-
 #' @importFrom methods is
 #' @keywords internal
-getSequence <- function(granges_obj, genome_obj, extension = 0, resize_fix = "end", min_length = 1) {
+getSequence <- function(granges_obj, genome_obj, extension = c(0, 0), min_length = 1) {
   # Input Validations
   if (!methods::is(granges_obj, "GRanges")) {
     stop("'granges_obj' must be a GRanges object.")
@@ -462,15 +462,13 @@ getSequence <- function(granges_obj, genome_obj, extension = 0, resize_fix = "en
   if (!methods::is(genome_obj, "BSgenome")) {
     stop("'genome_obj' must be a BSgenome object.")
   }
-  if (!is.numeric(extension) || length(extension) != 1) {
-    stop("'extension' must be a single numeric value (integer preferred).")
+  if (!is.numeric(extension) || length(extension) != 2) {
+    stop("'extension' must be a numeric vector of length 2: c(five_prime, three_prime).")
   }
-  extension <- as.integer(extension) # Ensure it's integer
+  extension <- as.integer(extension) # Ensure integers
+  ext_5prime <- extension[1]
+  ext_3prime <- extension[2]
 
-  if (!is.character(resize_fix) || length(resize_fix) != 1 ||
-      !resize_fix %in% c("start", "end", "center")) {
-    stop("'resize_fix' must be one of 'start', 'end', or 'center'.")
-  }
   if (!is.numeric(min_length) || length(min_length) != 1 || min_length < 1 || min_length %% 1 != 0) {
     stop("'min_length' must be a single positive integer.")
   }
@@ -483,59 +481,69 @@ getSequence <- function(granges_obj, genome_obj, extension = 0, resize_fix = "en
   # Store original metadata and add an index for robust re-attachment
   original_mcols <- S4Vectors::mcols(granges_obj)
   original_names <- names(granges_obj)
-  granges_obj$..original_index.. <- seq_along(granges_obj) # Temporary index column
+  original_count <- length(granges_obj)
 
-  # Apply extension by calculating target widths
-  # The width argument to resize is the *target* final width.
-  target_widths <- GenomicRanges::width(granges_obj) + extension
+  # Work with a copy to modify coordinates
+  current_gr <- granges_obj
+  current_gr$..original_index.. <- seq_along(current_gr) # Temporary index column
 
-  # Filter ranges that would become non-positive in width *before* resizing.
-  # GenomicRanges::resize() errors on non-positive target widths.
-  valid_for_resize_idx <- target_widths >= 1
+  # Get strand information
+  strand_info <- as.character(GenomicRanges::strand(current_gr))
 
-  if (any(!valid_for_resize_idx)) {
-    num_invalid_resize <- sum(!valid_for_resize_idx)
-    message(num_invalid_resize, " ranges would result in non-positive widths due to 'extension' ",
-            "value and will be removed before resizing.")
-    granges_obj <- granges_obj[valid_for_resize_idx]
-    target_widths <- target_widths[valid_for_resize_idx]
+  # Identify strand types
+  plus_strand_idx <- strand_info %in% c("+", "*")
+  minus_strand_idx <- strand_info == "-"
+
+  # Get current coordinates
+  new_start <- GenomicRanges::start(current_gr)
+  new_end <- GenomicRanges::end(current_gr)
+
+  # Apply strand-aware extension/trimming
+
+  # For + strand (and * strand): 5' = start, 3' = end
+  #   5' extension: start = start - ext_5prime (extend upstream)
+  #   3' extension: end = end + ext_3prime (extend downstream)
+  new_start[plus_strand_idx] <- new_start[plus_strand_idx] - ext_5prime
+  new_end[plus_strand_idx] <- new_end[plus_strand_idx] + ext_3prime
+
+  # For - strand: 5' = end, 3' = start (reversed)
+  #   5' extension: end = end + ext_5prime (extend upstream on - strand)
+  #   3' extension: start = start - ext_3prime (extend downstream on - strand)
+  new_end[minus_strand_idx] <- new_end[minus_strand_idx] + ext_5prime
+  new_start[minus_strand_idx] <- new_start[minus_strand_idx] - ext_3prime
+
+  # Calculate final widths (before applying to GRanges, to check validity)
+  final_widths <- new_end - new_start + 1
+
+  # Filter ranges that would become too short (< min_length)
+  valid_idx <- final_widths >= min_length
+
+  num_removed_short <- sum(!valid_idx)
+  if (num_removed_short > 0) {
+    message(num_removed_short, " ranges removed due to final length < ", min_length,
+            " after extension/trimming.")
   }
 
-  if (length(granges_obj) == 0) {
-    message("No ranges remaining after filtering for non-positive target widths.")
+  if (!any(valid_idx)) {
+    message("No ranges remaining after filtering for minimum length.")
     return(Biostrings::DNAStringSet())
   }
 
-  # Perform resizing
-  current_gr <- granges_obj # Start with the (potentially filtered) granges_obj
-  if (extension != 0) {
-    # Suppress warnings from resize if target_widths are valid (>=1)
-    current_gr <- suppressWarnings(
-      GenomicRanges::resize(current_gr, width = target_widths, fix = resize_fix, ignore.strand = FALSE)
-    )
-  }
+  # Apply changes only to valid ranges
+  current_gr <- current_gr[valid_idx]
+  new_start <- new_start[valid_idx]
+  new_end <- new_end[valid_idx]
 
-  # Filter by min_length
-  widths_after_resize_or_original <- GenomicRanges::width(current_gr)
-  keep_idx_min_length <- widths_after_resize_or_original >= min_length
-
-  if (any(!keep_idx_min_length)) {
-    num_removed_min_length <- sum(!keep_idx_min_length)
-    # message(num_removed_min_length, " ranges removed because their final length was less than min_length (", min_length, ").")
-    current_gr <- current_gr[keep_idx_min_length]
-  }
-
-  if (length(current_gr) == 0) {
-    message("No ranges remaining after filtering by 'min_length'.")
-    return(Biostrings::DNAStringSet())
-  }
+  # Update coordinates
+  GenomicRanges::start(current_gr) <- new_start
+  GenomicRanges::end(current_gr) <- new_end
 
   # Filter for valid seqlevels & trim to chromosome boundaries
   valid_seqlevels <- intersect(GenomeInfoDb::seqlevels(current_gr), GenomeInfoDb::seqlevels(genome_obj))
 
   if (length(valid_seqlevels) < length(GenomeInfoDb::seqlevelsInUse(current_gr))) {
     original_gr_count_sl <- length(current_gr)
-    current_gr <- GenomeInfoDb::keepSeqlevels(current_gr, valid_seqlevels, pruning.mode="tidy")
+    current_gr <- GenomeInfoDb::keepSeqlevels(current_gr, valid_seqlevels, pruning.mode = "tidy")
     num_removed_sl <- original_gr_count_sl - length(current_gr)
     if (num_removed_sl > 0) {
       message(num_removed_sl, " ranges removed due to seqlevels not present in the genome object.")
@@ -548,14 +556,23 @@ getSequence <- function(granges_obj, genome_obj, extension = 0, resize_fix = "en
   }
 
   genome_seqlengths_subset <- GenomeInfoDb::seqlengths(genome_obj)[GenomeInfoDb::seqlevels(current_gr)]
-  # Handle cases where a seqlevel in current_gr might not have a length in genome_seqlengths_subset
-  # (should not happen if keepSeqlevels and intersect worked correctly, but as a safeguard)
   genome_seqlengths_subset <- genome_seqlengths_subset[!is.na(genome_seqlengths_subset)]
-  # Only assign for common levels
   common_levels_for_seqlengths <- intersect(names(genome_seqlengths_subset), GenomeInfoDb::seqlevels(current_gr))
   GenomeInfoDb::seqlengths(current_gr)[common_levels_for_seqlengths] <- genome_seqlengths_subset[common_levels_for_seqlengths]
 
+  # Trim to chromosome boundaries (handles negative starts and exceeding ends)
   trimmed_gr <- GenomicRanges::trim(current_gr)
+
+  # After trimming, check min_length again (coordinates may have been clipped)
+  widths_after_trim <- GenomicRanges::width(trimmed_gr)
+  keep_after_trim <- widths_after_trim >= min_length
+
+  if (any(!keep_after_trim)) {
+    num_removed_after_trim <- sum(!keep_after_trim)
+    message(num_removed_after_trim, " ranges removed after chromosome boundary trimming ",
+            "resulted in length < ", min_length, ".")
+    trimmed_gr <- trimmed_gr[keep_after_trim]
+  }
 
   if (length(trimmed_gr) == 0) {
     message("No valid ranges remaining after trimming to chromosome boundaries.")
@@ -579,16 +596,17 @@ getSequence <- function(granges_obj, genome_obj, extension = 0, resize_fix = "en
     trimmed_gr$..original_index.. <- NULL # Remove temporary index column
   } else if (length(trimmed_gr) > 0) {
     warning("Could not re-attach original metadata due to missing internal index. Metadata might be lost.")
-    S4Vectors::mcols(trimmed_gr) <- NULL # Clear mcols for safety
-    names(trimmed_gr) <- NULL # Clear names for safety
+    S4Vectors::mcols(trimmed_gr) <- NULL
+    names(trimmed_gr) <- NULL
   }
 
   # Get sequences
   sequences <- Biostrings::getSeq(genome_obj, trimmed_gr)
-  # Names of sequences will be inherited from names(trimmed_gr)
 
   return(sequences)
 }
+
+
 
 
 #' Count K-mers in Sequences
@@ -659,6 +677,7 @@ countKmers <- function(sequences, K, type = "DNA") {
 
   # Generate all possible K-mers based on the selected alphabet and K
   # This list will be in uppercase.
+  # If type is RNA, this produces motifs with 'U'.
   kmer_grid <- base::expand.grid(replicate(K, selected_nucleotides, simplify = FALSE))
   all_kmers_vector <- do.call(paste0, kmer_grid)
 
@@ -670,11 +689,21 @@ countKmers <- function(sequences, K, type = "DNA") {
     return(data.frame(MOTIF = all_kmers_vector, COUNT = 0L, stringsAsFactors = FALSE))
   }
 
-  # Create PDict (Pattern Dictionary) from the character vector of all K-mers
-  # The patterns in PDict will be treated as case-sensitive by default by vcountPDict,
-  # so if input 'sequences' are not uppercase, they might not match.
-  # However, DNAStringSet objects usually store sequences in uppercase.
-  kmer_pdict <- Biostrings::PDict(all_kmers_vector)
+  # Create PDict (Pattern Dictionary)
+  # Biostrings::PDict supports DNAStringSet but NOT RNAStringSet.
+  # If we have RNA motifs (with 'U'), we map them to DNA (replace U with T)
+  # for the purpose of searching against the genomic sequences (which are returned
+  # as DNAStringSet by getSequence/BSgenome).
+  
+  if (type_upper == "RNA") {
+     # Map U -> T for the dictionary creation only.
+     # The results_df will still use the original 'all_kmers_vector' with 'U'.
+     search_kmers_vector <- gsub("U", "T", all_kmers_vector)
+     kmer_pdict <- Biostrings::PDict(search_kmers_vector)
+  } else {
+     # DNA: use directly
+     kmer_pdict <- Biostrings::PDict(all_kmers_vector)
+  }
 
   # Count K-mers
   # collapse = TRUE sums counts over all sequences in the DNAStringSet
@@ -682,7 +711,7 @@ countKmers <- function(sequences, K, type = "DNA") {
 
   # Create and return results data frame
   results_df <- data.frame(
-    MOTIF = all_kmers_vector,         # Character vector of all possible K-mers (uppercase)
+    MOTIF = all_kmers_vector,         # Character vector of all possible K-mers (with U if RNA)
     COUNT = as.integer(kmer_counts),  # Ensure counts are integer
     stringsAsFactors = FALSE
   )
@@ -700,9 +729,9 @@ countKmers <- function(sequences, K, type = "DNA") {
 #' @param genome_obj A BSgenome object from which sequences will be extracted.
 #' @param K Integer, the K-mer length. This is used to set a minimum length
 #'   for sequences extracted by the internal call to `getSequence`.
-#' @param Bkg_dist Integer, the minimum absolute distance (in base pairs) by which
+#' @param bkg_min_dist Integer, the minimum absolute distance (in base pairs) by which
 #'   peaks should be shifted. Passed as `X` to `genRNDist()`.
-#' @param max_shift_dist Integer, the maximum absolute distance (in base pairs)
+#' @param bkg_max_dist Integer, the maximum absolute distance (in base pairs)
 #'   for shifting peaks. Passed as `max_dist` to `genRNDist()`.
 #'
 #' @return A DNAStringSet object of one set of scrambled background sequences.
@@ -716,7 +745,7 @@ countKmers <- function(sequences, K, type = "DNA") {
 #'
 #' @keywords internal
 generateBkgSet <- function(peak_gr, genome_obj, K,
-                           Bkg_dist, max_shift_dist) {
+                           bkg_min_dist, bkg_max_dist) {
 
   # Input Validation
   if (!methods::is(peak_gr, "GRanges") || length(peak_gr) == 0) {
@@ -728,12 +757,12 @@ generateBkgSet <- function(peak_gr, genome_obj, K,
   if (!is.numeric(K) || length(K) != 1 || K <= 0 || K %% 1 != 0) {
     stop("'K' must be a single positive integer in generateBkgSet.")
   }
-  # Bkg_dist and max_shift_dist validation is handled by genRNDist
+  # bkg_min_dist and bkg_max_dist validation is handled by genRNDist
 
   num_peaks <- length(peak_gr)
 
   # Generate random shift distances
-  rand_distances <- genRNDist(N = num_peaks, X = Bkg_dist, max_dist = max_shift_dist)
+  rand_distances <- genRNDist(N = num_peaks, X = bkg_min_dist, max_dist = bkg_max_dist)
 
   # Shift original peaks
   # Suppress warnings for out-of-bounds shifts; getSequence will trim.
@@ -764,12 +793,12 @@ generateBkgSet <- function(peak_gr, genome_obj, K,
   }
 
   # Get sequences for the valid background regions
-  # No additional extension (extension = 0).
+  # No additional extension (extension = c(0, 0)).
   # Sequences must be at least K long for countKmers to work.
   background_seqs_gr <- getSequence(
     granges_obj = shifted_gr_filtered,
     genome_obj = genome_obj,
-    extension = 0,
+    extension = c(0, 0),
     min_length = K # Ensure sequences are viable for K-mer counting
   )
 

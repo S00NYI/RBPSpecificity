@@ -4,7 +4,7 @@
 \alias{generateBkgSet}
 \title{Generate a Single Set of Background Sequences}
 \usage{
-generateBkgSet(peak_gr, genome_obj, K, Bkg_dist, max_shift_dist)
+generateBkgSet(peak_gr, genome_obj, K, bkg_min_dist, bkg_max_dist)
 }
 \arguments{
 \item{peak_gr}{A GRanges object representing the original genomic peaks.}
@@ -14,10 +14,10 @@ generateBkgSet(peak_gr, genome_obj, K, Bkg_dist, max_shift_dist)
 \item{K}{Integer, the K-mer length. This is used to set a minimum length
 for sequences extracted by the internal call to `getSequence`.}
 
-\item{Bkg_dist}{Integer, the minimum absolute distance (in base pairs) by which
+\item{bkg_min_dist}{Integer, the minimum absolute distance (in base pairs) by which
 peaks should be shifted. Passed as `X` to `genRNDist()`.}
 
-\item{max_shift_dist}{Integer, the maximum absolute distance (in base pairs)
+\item{bkg_max_dist}{Integer, the maximum absolute distance (in base pairs)
 for shifting peaks. Passed as `max_dist` to `genRNDist()`.}
 }
 \value{

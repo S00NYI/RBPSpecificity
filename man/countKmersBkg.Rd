@@ -9,9 +9,9 @@ countKmersBkg(
   K,
   type = "DNA",
   genome_obj,
-  Bkg_dist = 500,
-  Bkg_number = 100,
-  max_shift_dist = 1000,
+  bkg_min_dist = 500,
+  bkg_iter = 100,
+  bkg_max_dist = 1000,
   internal_min_length_for_bkg_seqs = K
 )
 }
@@ -27,13 +27,13 @@ generate the K-mer universe. Default: "DNA".}
 
 \item{genome_obj}{A BSgenome object for sequence retrieval by `generateBkgSet`.}
 
-\item{Bkg_dist}{Integer, the minimum absolute distance (in base pairs) for
+\item{bkg_min_dist}{Integer, the minimum absolute distance (in base pairs) for
 shifting peaks. Passed to `generateBkgSet`. Default: 500.}
 
-\item{Bkg_number}{Integer, the number of background iterations to perform.
+\item{bkg_iter}{Integer, the number of background iterations to perform.
 Default: 100.}
 
-\item{max_shift_dist}{Integer, the maximum absolute distance (in base pairs)
+\item{bkg_max_dist}{Integer, the maximum absolute distance (in base pairs)
 for shifting peaks. Passed to `generateBkgSet`. Default: 1000.}
 
 \item{internal_min_length_for_bkg_seqs}{Integer, minimum length for sequences

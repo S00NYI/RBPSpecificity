@@ -22,14 +22,14 @@ if (!requireNamespace("devtools", quietly = TRUE))
 devtools::install_github("S00NYI/RBPSpecificity")
 ```
 
-### From Bioconductor (After Acceptance)
+<!-- ### From Bioconductor (After Acceptance)
 
 ```r
 if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 
 BiocManager::install("RBPSpecificity")
-```
+``` -->
 
 ## Quick Start
 
@@ -60,6 +60,48 @@ plotMS(enrichment)
 - **Mutational Sensitivity (MS)** - Measure sensitivity to single nucleotide changes
 - **De novo enrichment** - Calculate k-mer enrichment directly from CLIP peaks
 - **Visualization** - Distribution plots and sensitivity profiles
+
+## Available Functions
+
+### `motifEnrichment`
+Main workflow function to calculate K-mer enrichment.
+- **coordinates**: data frame or GRanges containing genomic coordinates.
+- **species_or_build**: text string for genome build (e.g. "hg38").
+- **K**: integer K-mer length (e.g. 5).
+- **extension**: numeric vector `c(5', 3')` to shift 5'/3' ends. Positive extends, negative trims. (default: `c(0,0)`).
+- **enrichment_method**: "subtract" (default), "fold_change", or "log2_fold_change".
+- **normalization_method**: "min_max" (default), "z_score", "log2", or "none".
+- **log_transform**: logical, apply log transformation (default: TRUE).
+- **bkg_iter**: number of background iterations (default: 100).
+- **bkg_min_dist**: min shift for background (default: 500).
+- **bkg_max_dist**: max shift for background (default: 1000).
+- **nucleic_acid_type**: "DNA" or "RNA" (default: "DNA").
+
+### `returnIS`
+Calculate Inherent Specificity (IS).
+- **motif_enrichment**: result from `motifEnrichment`.
+- **motif**: target motif (default: top scoring).
+- **return_type**: "specific" (default) or "all".
+
+### `returnMS`
+Calculate Mutational Sensitivity (MS).
+- **motif_enrichment**: result from `motifEnrichment`.
+- **motif**: reference motif (default: top scoring).
+- **return_type**: "specific" (default) or "all".
+- **output_type**: "matrix" (default) or "number".
+- **sensitivity_method**: calculation method (default: "1_minus_norm_score").
+
+### `plotIS`
+Visualize IS value on score distribution.
+- **motif_enrichment**: result from `motifEnrichment`.
+- **motif**: target motif (default: top scoring).
+- **bins**: histogram bins (default: 50).
+
+### `plotMS`
+Visualize Mutational Sensitivity matrix.
+- **motif_enrichment**: result from `motifEnrichment`.
+- **motif**: reference motif (default: top scoring).
+
 
 ## Documentation
 

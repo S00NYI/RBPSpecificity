@@ -63,7 +63,7 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
 
   # Get the template of all possible K-mers to define rows and order
   # Call countKmers with an empty DNAStringSet to get the MOTIF column structure
-  template_kmers_df <- countKmers(sequences = Biostrings::DNAStringSet(), K = K, type = type)
+  template_kmers_df <- suppressMessages(countKmers(sequences = Biostrings::DNAStringSet(), K = K, type = type))
   all_kmers_vector <- template_kmers_df$MOTIF
 
   if (length(all_kmers_vector) == 0 && K > 0) { # K=0 is invalid, caught by countKmers

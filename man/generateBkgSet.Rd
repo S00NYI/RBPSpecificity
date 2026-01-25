@@ -4,14 +4,7 @@
 \alias{generateBkgSet}
 \title{Generate a Single Set of Background Sequences}
 \usage{
-generateBkgSet(
-  peak_gr,
-  genome_obj,
-  K,
-  bkg_min_dist,
-  bkg_max_dist,
-  max_retries = 3
-)
+generateBkgSet(peak_gr, genome_obj, K, bkg_min_dist, bkg_max_dist)
 }
 \arguments{
 \item{peak_gr}{A GRanges object representing the original genomic peaks.}
@@ -26,19 +19,15 @@ peaks should be shifted. Passed as `X` to `genRNDist()`.}
 
 \item{bkg_max_dist}{Integer, the maximum absolute distance (in base pairs)
 for shifting peaks. Passed as `max_dist` to `genRNDist()`.}
-
-\item{max_retries}{Integer, the maximum number of retry attempts for peaks
-that fail to generate valid background sequences. Default: 3.}
 }
 \value{
 A DNAStringSet object of one set of scrambled background sequences.
   Returns an empty DNAStringSet if no valid background regions/sequences
-  could be generated after all retry attempts.
+  could be generated.
 }
 \description{
 Creates one set of scrambled background sequences by randomly
   shifting original peak locations, removing overlaps with original peaks,
-  extracting sequences, and then scrambling them. Uses a retry mechanism
-  to replace ranges that fail due to overlaps or chromosome boundary issues.
+  extracting sequences, and then scrambling them.
 }
 \keyword{internal}

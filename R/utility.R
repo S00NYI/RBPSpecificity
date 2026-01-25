@@ -750,8 +750,7 @@ countKmers <- function(sequences, K, type = "DNA") {
 #'
 #' @description Creates one set of scrambled background sequences by randomly
 #'   shifting original peak locations, removing overlaps with original peaks,
-#'   extracting sequences, and then scrambling them. Uses a retry mechanism
-#'   to replace ranges that fail due to overlaps or chromosome boundary issues.
+#'   extracting sequences, and then scrambling them.
 #'
 #' @param peak_gr A GRanges object representing the original genomic peaks.
 #' @param genome_obj A BSgenome object from which sequences will be extracted.
@@ -761,12 +760,10 @@ countKmers <- function(sequences, K, type = "DNA") {
 #'   peaks should be shifted. Passed as `X` to `genRNDist()`.
 #' @param bkg_max_dist Integer, the maximum absolute distance (in base pairs)
 #'   for shifting peaks. Passed as `max_dist` to `genRNDist()`.
-#' @param max_retries Integer, the maximum number of retry attempts for peaks
-#'   that fail to generate valid background sequences. Default: 3.
 #'
 #' @return A DNAStringSet object of one set of scrambled background sequences.
 #'   Returns an empty DNAStringSet if no valid background regions/sequences
-#'   could be generated after all retry attempts.
+#'   could be generated.
 #'
 #' @importFrom GenomicRanges GRanges shift findOverlaps width
 #' @importFrom Biostrings DNAStringSet BString
@@ -775,8 +772,7 @@ countKmers <- function(sequences, K, type = "DNA") {
 #'
 #' @keywords internal
 generateBkgSet <- function(peak_gr, genome_obj, K,
-                           bkg_min_dist, bkg_max_dist,
-                           max_retries = 3) {
+                           bkg_min_dist, bkg_max_dist) {
   # Input Validation
   if (!methods::is(peak_gr, "GRanges") || length(peak_gr) == 0) {
     stop("'peak_gr' must be a non-empty GRanges object in generateBkgSet.")
@@ -791,101 +787,68 @@ generateBkgSet <- function(peak_gr, genome_obj, K,
 
   num_peaks <- length(peak_gr)
 
-  # Initialize storage for successfully generated background sequences
-  all_scrambled_seqs <- Biostrings::DNAStringSet()
+  # Generate random shift distances
+  rand_distances <- genRNDist(N = num_peaks, X = bkg_min_dist, max_dist = bkg_max_dist)
 
-  # Track which peak indices still need valid background sequences
-  pending_indices <- seq_len(num_peaks)
+  # Shift original peaks
+  # Suppress warnings for out-of-bounds shifts; getSequence will trim.
+  shifted_gr <- suppressWarnings(GenomicRanges::shift(peak_gr, shift = rand_distances))
 
-  attempt <- 0
-  while (length(pending_indices) > 0 && attempt < max_retries) {
-    attempt <- attempt + 1
+  # Remove shifted regions that overlap with ANY original peak
+  # type = "any" means any kind of overlap.
+  # select = "all" gives all pairs. We need queryHits to index shifted_gr.
+  # ignore.strand = TRUE because overlaps are purely positional for background exclusion.
+  overlaps_with_original <- GenomicRanges::findOverlaps(
+    shifted_gr,
+    peak_gr,
+    type = "any",
+    select = "all",
+    ignore.strand = TRUE
+  )
 
-    # Get the subset of peaks that still need background generation
-    current_peaks <- peak_gr[pending_indices]
-
-    # Generate random shift distances for pending peaks
-    rand_distances <- genRNDist(
-      N = length(current_peaks),
-      X = bkg_min_dist,
-      max_dist = bkg_max_dist
-    )
-
-    # Shift peaks (suppress warnings for out-of-bounds shifts)
-    shifted_gr <- suppressWarnings(
-      GenomicRanges::shift(current_peaks, shift = rand_distances)
-    )
-
-    # Track which shifted ranges are valid (not overlapping with original peaks)
-    # We need to check against ALL original peaks, not just pending ones
-    overlaps_with_original <- GenomicRanges::findOverlaps(
-      shifted_gr,
-      peak_gr, # Check against ALL original peaks
-      type = "any",
-      select = "all",
-      ignore.strand = TRUE
-    )
-
-    overlap_indices <- S4Vectors::queryHits(overlaps_with_original)
-    valid_shift_mask <- rep(TRUE, length(shifted_gr))
-    if (length(overlap_indices) > 0) {
-      valid_shift_mask[overlap_indices] <- FALSE
-    }
-
-    # Keep only non-overlapping shifted ranges
-    shifted_gr_filtered <- shifted_gr[valid_shift_mask]
-    corresponding_pending_indices <- pending_indices[valid_shift_mask]
-
-    if (length(shifted_gr_filtered) == 0) {
-      # All shifted ranges overlapped; retry with new shifts
-      next
-    }
-
-    # Get sequences - suppress messages to avoid redundant output
-    background_seqs <- suppressMessages(getSequence(
-      granges_obj = shifted_gr_filtered,
-      genome_obj = genome_obj,
-      extension = c(0, 0),
-      min_length = K
-    ))
-
-    if (length(background_seqs) == 0) {
-      # All sequences failed (boundary trimming, etc.); retry
-      next
-    }
-
-    # Scramble sequences
-    scrambled_seq_list <- lapply(as.list(background_seqs), scrambleDNA)
-    scrambled_seqs <- Biostrings::DNAStringSet(scrambled_seq_list)
-
-    # Filter out empty sequences
-    valid_seq_mask <- Biostrings::width(scrambled_seqs) > 0
-    scrambled_seqs <- scrambled_seqs[valid_seq_mask]
-
-    # The tricky part: we need to know which pending_indices succeeded.
-    # getSequence may drop some ranges, so we track by checking which survived.
-    # Since getSequence doesn't return indices, we approximate by counting successes.
-    # For simplicity, we'll add what we got and update pending_indices proportionally.
-
-    if (length(scrambled_seqs) > 0) {
-      all_scrambled_seqs <- c(all_scrambled_seqs, scrambled_seqs)
-
-      # Remove successfully processed indices from pending
-      # We successfully generated len(scrambled_seqs) sequences out of len(corresponding_pending_indices)
-      # For simplicity, remove the first N pending indices that could have succeeded
-      num_successes <- min(length(scrambled_seqs), length(corresponding_pending_indices))
-      successful_pending <- corresponding_pending_indices[valid_seq_mask[seq_len(sum(valid_shift_mask))]]
-
-      # Update pending_indices: keep only those that didn't produce valid sequences
-      pending_indices <- setdiff(pending_indices, successful_pending[seq_len(num_successes)])
-    }
+  indices_to_remove <- S4Vectors::queryHits(overlaps_with_original)
+  if (length(indices_to_remove) > 0) {
+    shifted_gr_filtered <- shifted_gr[-indices_to_remove]
+  } else {
+    shifted_gr_filtered <- shifted_gr
   }
 
-  if (length(all_scrambled_seqs) == 0) {
+  if (length(shifted_gr_filtered) == 0) {
+    # No valid non-overlapping regions generated
     return(Biostrings::DNAStringSet())
   }
 
-  return(all_scrambled_seqs)
+  # Get sequences for the valid background regions
+  # No additional extension (extension = c(0, 0)).
+  # Sequences must be at least K long for countKmers to work.
+  # Suppress messages to avoid redundant per-iteration output.
+  background_seqs_gr <- suppressMessages(getSequence(
+    granges_obj = shifted_gr_filtered,
+    genome_obj = genome_obj,
+    extension = c(0, 0),
+    min_length = K # Ensure sequences are viable for K-mer counting
+  ))
+
+  if (length(background_seqs_gr) == 0) {
+    # No valid sequences obtained (e.g., all trimmed to < K length)
+    return(Biostrings::DNAStringSet())
+  }
+
+  # Scramble sequences
+  # scrambleDNA works on a single sequence. Use lapply for DNAStringSet.
+  # as.list converts DNAStringSet to a list of individual DNAString objects.
+  scrambled_seq_list <- lapply(as.list(background_seqs_gr), scrambleDNA)
+  final_scrambled_seqs <- Biostrings::DNAStringSet(scrambled_seq_list)
+
+  # Filter out any truly empty sequences that might result if scrambleDNA returned empty
+  # (Our scrambleDNA returns empty DNAString for empty/NA input, which then results in 0-width here)
+  final_scrambled_seqs <- final_scrambled_seqs[Biostrings::width(final_scrambled_seqs) > 0]
+
+  if (length(final_scrambled_seqs) == 0) {
+    return(Biostrings::DNAStringSet())
+  }
+
+  return(final_scrambled_seqs)
 }
 
 

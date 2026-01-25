@@ -31,19 +31,19 @@ Counts occurrences of all possible K-mers of a given length
 }
 \examples{
 \dontrun{
-  # Assuming 'seqs' is a DNAStringSet object and 'getSequence' is available
-  # library(Biostrings)
-  # seqs_dna <- DNAStringSet(c("ATGCGATGC", "GGCCTTAA", "TTT"))
-  # countKmers(seqs_dna, K = 3, type = "DNA")
+# Assuming 'seqs' is a DNAStringSet object and 'getSequence' is available
+# library(Biostrings)
+# seqs_dna <- DNAStringSet(c("ATGCGATGC", "GGCCTTAA", "TTT"))
+# countKmers(seqs_dna, K = 3, type = "DNA")
 
-  # seqs_rna <- DNAStringSet(c("AUGCGAUGC", "GGCCUUAA", "UUU"))
-  # countKmers(seqs_rna, K = 3, type = "RNA")
+# seqs_rna <- DNAStringSet(c("AUGCGAUGC", "GGCCUUAA", "UUU"))
+# countKmers(seqs_rna, K = 3, type = "RNA")
 
-  # Empty input
-  # countKmers(DNAStringSet(), K = 3)
+# Empty input
+# countKmers(DNAStringSet(), K = 3)
 
-  # Sequences shorter than K
-  # countKmers(DNAStringSet(c("A", "CG")), K = 3)
+# Sequences shorter than K
+# countKmers(DNAStringSet(c("A", "CG")), K = 3)
 }
 }
 \keyword{internal}

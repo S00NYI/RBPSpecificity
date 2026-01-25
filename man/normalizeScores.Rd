@@ -27,13 +27,13 @@ Applies a specified normalization method to a numeric vector of scores.
 }
 \examples{
 \dontrun{
-  test_scores <- c(10, 20, 30, 40, 50, NA)
-  normalizeScores(test_scores, method = "min_max")
-  normalizeScores(test_scores, method = "min_max", a = 0, b = 10)
-  normalizeScores(test_scores, method = "z_score")
-  normalizeScores(c(0, 1, 3, 7, 15, NA), method = "log2") # Uses pseudocount = 1
-  normalizeScores(c(0, 1, 3, 7, 15), method = "log2", pseudocount = 0.1)
-  normalizeScores(test_scores, method = "none") # Returns original scores
+test_scores <- c(10, 20, 30, 40, 50, NA)
+normalizeScores(test_scores, method = "min_max")
+normalizeScores(test_scores, method = "min_max", a = 0, b = 10)
+normalizeScores(test_scores, method = "z_score")
+normalizeScores(c(0, 1, 3, 7, 15, NA), method = "log2") # Uses pseudocount = 1
+normalizeScores(c(0, 1, 3, 7, 15), method = "log2", pseudocount = 0.1)
+normalizeScores(test_scores, method = "none") # Returns original scores
 }
 }
 \keyword{#}

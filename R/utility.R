@@ -135,7 +135,7 @@ genRNDist <- function(N, X = 500, max_dist = 1000) {
 #'
 #' @return A character vector of all unique SNV motifs (excluding the original motif).
 #' @keywords internal
-genMotifVar <- function(motif, type = 'DNA') {
+genMotifVar <- function(motif, type = "DNA") {
   # Validate 'type' input
   if (!is.character(type) || length(type) != 1) {
     stop("'type' must be a single character string ('DNA' or 'RNA').")
@@ -144,10 +144,10 @@ genMotifVar <- function(motif, type = 'DNA') {
   type_upper <- toupper(type) # Normalize for case-insensitive comparison
 
   nucleotides <- switch(type_upper,
-                        "DNA" = c('A', 'C', 'G', 'T'),
-                        "RNA" = c('A', 'C', 'G', 'U'),
-                        # Default case if type_upper matches neither:
-                        stop("Invalid 'type': must be 'DNA' or 'RNA'. Received: '", type, "'")
+    "DNA" = c("A", "C", "G", "T"),
+    "RNA" = c("A", "C", "G", "U"),
+    # Default case if type_upper matches neither:
+    stop("Invalid 'type': must be 'DNA' or 'RNA'. Received: '", type, "'")
   )
 
   # Validate 'motif' input (basic checks)
@@ -164,10 +164,12 @@ genMotifVar <- function(motif, type = 'DNA') {
 
   if (!are_chars_valid) {
     invalid_chars <- unique(original_chars[!(original_chars %in% nucleotides)])
-    stop(paste0("Motif '", motif, "' contains invalid characters: '",
-                paste(invalid_chars, collapse = "', '"),
-                "'. Expected characters for type '", type_upper, "' are: '",
-                paste(nucleotides, collapse = "', '"), "'."))
+    stop(paste0(
+      "Motif '", motif, "' contains invalid characters: '",
+      paste(invalid_chars, collapse = "', '"),
+      "'. Expected characters for type '", type_upper, "' are: '",
+      paste(nucleotides, collapse = "', '"), "'."
+    ))
   }
 
   variants <- character() # Initialize empty vector
@@ -224,7 +226,7 @@ findTopMotif <- function(motif_enrichment) {
   if (!all(required_cols %in% colnames(motif_enrichment))) {
     stop("Data frame must contain 'MOTIF' and either 'Score' or 'Enrichment' columns.")
   }
-  if(nrow(motif_enrichment) == 0) {
+  if (nrow(motif_enrichment) == 0) {
     stop("Input data frame 'motif_enrichment' is empty.")
   }
 
@@ -258,8 +260,10 @@ valInputMotif <- function(motif, kmer_size, available_motifs) {
   }
   # Check length
   if (nchar(motif) != kmer_size) {
-    stop("Provided motif '", motif, "' has length ", nchar(motif),
-         ", but expected length is ", kmer_size, ".")
+    stop(
+      "Provided motif '", motif, "' has length ", nchar(motif),
+      ", but expected length is ", kmer_size, "."
+    )
   }
   # Check if motif exists in the available set
   if (!(motif %in% available_motifs)) {
@@ -303,17 +307,21 @@ selectGenome <- function(species_or_build) {
   pkg_name <- genome_map[[lookup]]
 
   if (is.null(pkg_name)) {
-    stop("Unknown species or build identifier: '", species_or_build,
-         "'. Supported identifiers include: ", paste(names(genome_map), collapse=", "))
+    stop(
+      "Unknown species or build identifier: '", species_or_build,
+      "'. Supported identifiers include: ", paste(names(genome_map), collapse = ", ")
+    )
   }
 
   # Check if the package is installed
   if (!requireNamespace(pkg_name, quietly = TRUE)) {
-    stop("The required genome package '", pkg_name, "' is not installed.\n",
-         "Please install it using BiocManager, e.g.:\n",
-         "if (!requireNamespace(\"BiocManager\", quietly = TRUE))\n",
-         "    install.packages(\"BiocManager\")\n",
-         "BiocManager::install(\"", pkg_name, "\")")
+    stop(
+      "The required genome package '", pkg_name, "' is not installed.\n",
+      "Please install it using BiocManager, e.g.:\n",
+      "if (!requireNamespace(\"BiocManager\", quietly = TRUE))\n",
+      "    install.packages(\"BiocManager\")\n",
+      "BiocManager::install(\"", pkg_name, "\")"
+    )
   }
 
   # Load and return the genome object
@@ -338,7 +346,6 @@ selectGenome <- function(species_or_build) {
 #' @importFrom methods is
 #' @keywords internal
 peakParse <- function(input, standard_chroms_only = TRUE, keep_extra = TRUE) {
-
   initial_gr <- NULL
 
   if (methods::is(input, "GRanges")) {
@@ -353,36 +360,52 @@ peakParse <- function(input, standard_chroms_only = TRUE, keep_extra = TRUE) {
     strand_col <- NULL # Optional
 
     # Try to find chromosome column
-    if ("seqnames" %in% col_names) chr_col <- "seqnames"
-    else if ("chr" %in% col_names) chr_col <- "chr"
-    else if ("chromosome" %in% col_names) chr_col <- "chromosome"
-    else stop("Input data frame must contain a chromosome column (e.g., 'chr', 'seqnames').")
+    if ("seqnames" %in% col_names) {
+      chr_col <- "seqnames"
+    } else if ("chr" %in% col_names) {
+      chr_col <- "chr"
+    } else if ("chromosome" %in% col_names) {
+      chr_col <- "chromosome"
+    } else {
+      stop("Input data frame must contain a chromosome column (e.g., 'chr', 'seqnames').")
+    }
 
-    if ("start" %in% col_names) start_col <- "start"
-    else stop("Input data frame must contain a 'start' column.")
+    if ("start" %in% col_names) {
+      start_col <- "start"
+    } else {
+      stop("Input data frame must contain a 'start' column.")
+    }
 
-    if ("end" %in% col_names) end_col <- "end"
-    else stop("Input data frame must contain an 'end' column.")
+    if ("end" %in% col_names) {
+      end_col <- "end"
+    } else {
+      stop("Input data frame must contain an 'end' column.")
+    }
 
     if ("strand" %in% col_names) strand_col <- "strand"
 
     # message("Attempting to create GRanges from data frame in peakParse...")
-    initial_gr <- tryCatch({
-      GenomicRanges::makeGRangesFromDataFrame(
-        df = df,
-        keep.extra.columns = keep_extra,
-        seqnames.field = chr_col,
-        start.field = start_col,
-        end.field = end_col,
-        strand.field = if(!is.null(strand_col)) strand_col else character(0),
-        starts.in.df.are.0based = FALSE # Assume 1-based starts unless specified
-      )
-    }, error = function(e) {
-      stop("Failed to create GRanges object from data frame in peakParse.\n",
-           "Ensure columns '", chr_col, "', '", start_col, "', '", end_col,
-           "' (and optionally '", strand_col, "') are present and valid.\n",
-           conditionMessage(e), call. = FALSE)
-    })
+    initial_gr <- tryCatch(
+      {
+        GenomicRanges::makeGRangesFromDataFrame(
+          df = df,
+          keep.extra.columns = keep_extra,
+          seqnames.field = chr_col,
+          start.field = start_col,
+          end.field = end_col,
+          strand.field = if (!is.null(strand_col)) strand_col else character(0),
+          starts.in.df.are.0based = FALSE # Assume 1-based starts unless specified
+        )
+      },
+      error = function(e) {
+        stop("Failed to create GRanges object from data frame in peakParse.\n",
+          "Ensure columns '", chr_col, "', '", start_col, "', '", end_col,
+          "' (and optionally '", strand_col, "') are present and valid.\n",
+          conditionMessage(e),
+          call. = FALSE
+        )
+      }
+    )
     # message("GRanges object created successfully from data frame in peakParse.")
   } else {
     stop("Input to peakParse must be a data frame or a GRanges object.")
@@ -520,8 +543,10 @@ getSequence <- function(granges_obj, genome_obj, extension = c(0, 0), min_length
 
   num_removed_short <- sum(!valid_idx)
   if (num_removed_short > 0) {
-    message(num_removed_short, " ranges removed due to final length < ", min_length,
-            " after extension/trimming.")
+    message(
+      num_removed_short, " ranges removed due to final length < ", min_length,
+      " after extension/trimming."
+    )
   }
 
   if (!any(valid_idx)) {
@@ -569,8 +594,10 @@ getSequence <- function(granges_obj, genome_obj, extension = c(0, 0), min_length
 
   if (any(!keep_after_trim)) {
     num_removed_after_trim <- sum(!keep_after_trim)
-    message(num_removed_after_trim, " ranges removed after chromosome boundary trimming ",
-            "resulted in length < ", min_length, ".")
+    message(
+      num_removed_after_trim, " ranges removed after chromosome boundary trimming ",
+      "resulted in length < ", min_length, "."
+    )
     trimmed_gr <- trimmed_gr[keep_after_trim]
   }
 
@@ -607,8 +634,6 @@ getSequence <- function(granges_obj, genome_obj, extension = c(0, 0), min_length
 }
 
 
-
-
 #' Count K-mers in Sequences
 #'
 #' @description Counts occurrences of all possible K-mers of a given length
@@ -636,19 +661,19 @@ getSequence <- function(granges_obj, genome_obj, extension = c(0, 0), min_length
 #'
 #' @examples
 #' \dontrun{
-#'   # Assuming 'seqs' is a DNAStringSet object and 'getSequence' is available
-#'   # library(Biostrings)
-#'   # seqs_dna <- DNAStringSet(c("ATGCGATGC", "GGCCTTAA", "TTT"))
-#'   # countKmers(seqs_dna, K = 3, type = "DNA")
+#' # Assuming 'seqs' is a DNAStringSet object and 'getSequence' is available
+#' # library(Biostrings)
+#' # seqs_dna <- DNAStringSet(c("ATGCGATGC", "GGCCTTAA", "TTT"))
+#' # countKmers(seqs_dna, K = 3, type = "DNA")
 #'
-#'   # seqs_rna <- DNAStringSet(c("AUGCGAUGC", "GGCCUUAA", "UUU"))
-#'   # countKmers(seqs_rna, K = 3, type = "RNA")
+#' # seqs_rna <- DNAStringSet(c("AUGCGAUGC", "GGCCUUAA", "UUU"))
+#' # countKmers(seqs_rna, K = 3, type = "RNA")
 #'
-#'   # Empty input
-#'   # countKmers(DNAStringSet(), K = 3)
+#' # Empty input
+#' # countKmers(DNAStringSet(), K = 3)
 #'
-#'   # Sequences shorter than K
-#'   # countKmers(DNAStringSet(c("A", "CG")), K = 3)
+#' # Sequences shorter than K
+#' # countKmers(DNAStringSet(c("A", "CG")), K = 3)
 #' }
 countKmers <- function(sequences, K, type = "DNA") {
   # Input Validation for 'sequences'
@@ -670,9 +695,9 @@ countKmers <- function(sequences, K, type = "DNA") {
   }
   type_upper <- toupper(type)
   selected_nucleotides <- switch(type_upper,
-                                 "DNA" = c('A', 'C', 'G', 'T'),
-                                 "RNA" = c('A', 'C', 'G', 'U'),
-                                 stop("Invalid 'type': must be 'DNA' or 'RNA'. Received: '", type, "'")
+    "DNA" = c("A", "C", "G", "T"),
+    "RNA" = c("A", "C", "G", "U"),
+    stop("Invalid 'type': must be 'DNA' or 'RNA'. Received: '", type, "'")
   )
 
   # Generate all possible K-mers based on the selected alphabet and K
@@ -684,8 +709,10 @@ countKmers <- function(sequences, K, type = "DNA") {
   # Handle edge case: empty sequences or all sequences shorter than K
   # S4Vectors::elementNROWS gets individual sequence lengths in a DNAStringSet
   if (length(sequences) == 0 || all(S4Vectors::elementNROWS(sequences) < K)) {
-    message("Input 'sequences' is empty or all sequences are shorter than K (", K, "). ",
-            "Returning all possible K-mers with counts of 0.")
+    message(
+      "Input 'sequences' is empty or all sequences are shorter than K (", K, "). ",
+      "Returning all possible K-mers with counts of 0."
+    )
     return(data.frame(MOTIF = all_kmers_vector, COUNT = 0L, stringsAsFactors = FALSE))
   }
 
@@ -694,15 +721,15 @@ countKmers <- function(sequences, K, type = "DNA") {
   # If we have RNA motifs (with 'U'), we map them to DNA (replace U with T)
   # for the purpose of searching against the genomic sequences (which are returned
   # as DNAStringSet by getSequence/BSgenome).
-  
+
   if (type_upper == "RNA") {
-     # Map U -> T for the dictionary creation only.
-     # The results_df will still use the original 'all_kmers_vector' with 'U'.
-     search_kmers_vector <- gsub("U", "T", all_kmers_vector)
-     kmer_pdict <- Biostrings::PDict(search_kmers_vector)
+    # Map U -> T for the dictionary creation only.
+    # The results_df will still use the original 'all_kmers_vector' with 'U'.
+    search_kmers_vector <- gsub("U", "T", all_kmers_vector)
+    kmer_pdict <- Biostrings::PDict(search_kmers_vector)
   } else {
-     # DNA: use directly
-     kmer_pdict <- Biostrings::PDict(all_kmers_vector)
+    # DNA: use directly
+    kmer_pdict <- Biostrings::PDict(all_kmers_vector)
   }
 
   # Count K-mers
@@ -711,8 +738,8 @@ countKmers <- function(sequences, K, type = "DNA") {
 
   # Create and return results data frame
   results_df <- data.frame(
-    MOTIF = all_kmers_vector,         # Character vector of all possible K-mers (with U if RNA)
-    COUNT = as.integer(kmer_counts),  # Ensure counts are integer
+    MOTIF = all_kmers_vector, # Character vector of all possible K-mers (with U if RNA)
+    COUNT = as.integer(kmer_counts), # Ensure counts are integer
     stringsAsFactors = FALSE
   )
   return(results_df)
@@ -723,7 +750,8 @@ countKmers <- function(sequences, K, type = "DNA") {
 #'
 #' @description Creates one set of scrambled background sequences by randomly
 #'   shifting original peak locations, removing overlaps with original peaks,
-#'   extracting sequences, and then scrambling them.
+#'   extracting sequences, and then scrambling them. Uses a retry mechanism
+#'   to replace ranges that fail due to overlaps or chromosome boundary issues.
 #'
 #' @param peak_gr A GRanges object representing the original genomic peaks.
 #' @param genome_obj A BSgenome object from which sequences will be extracted.
@@ -733,10 +761,12 @@ countKmers <- function(sequences, K, type = "DNA") {
 #'   peaks should be shifted. Passed as `X` to `genRNDist()`.
 #' @param bkg_max_dist Integer, the maximum absolute distance (in base pairs)
 #'   for shifting peaks. Passed as `max_dist` to `genRNDist()`.
+#' @param max_retries Integer, the maximum number of retry attempts for peaks
+#'   that fail to generate valid background sequences. Default: 3.
 #'
 #' @return A DNAStringSet object of one set of scrambled background sequences.
 #'   Returns an empty DNAStringSet if no valid background regions/sequences
-#'   could be generated.
+#'   could be generated after all retry attempts.
 #'
 #' @importFrom GenomicRanges GRanges shift findOverlaps width
 #' @importFrom Biostrings DNAStringSet BString
@@ -745,8 +775,8 @@ countKmers <- function(sequences, K, type = "DNA") {
 #'
 #' @keywords internal
 generateBkgSet <- function(peak_gr, genome_obj, K,
-                           bkg_min_dist, bkg_max_dist) {
-
+                           bkg_min_dist, bkg_max_dist,
+                           max_retries = 3) {
   # Input Validation
   if (!methods::is(peak_gr, "GRanges") || length(peak_gr) == 0) {
     stop("'peak_gr' must be a non-empty GRanges object in generateBkgSet.")
@@ -761,67 +791,101 @@ generateBkgSet <- function(peak_gr, genome_obj, K,
 
   num_peaks <- length(peak_gr)
 
-  # Generate random shift distances
-  rand_distances <- genRNDist(N = num_peaks, X = bkg_min_dist, max_dist = bkg_max_dist)
+  # Initialize storage for successfully generated background sequences
+  all_scrambled_seqs <- Biostrings::DNAStringSet()
 
-  # Shift original peaks
-  # Suppress warnings for out-of-bounds shifts; getSequence will trim.
-  shifted_gr <- suppressWarnings(GenomicRanges::shift(peak_gr, shift = rand_distances))
+  # Track which peak indices still need valid background sequences
+  pending_indices <- seq_len(num_peaks)
 
-  # Remove shifted regions that overlap with ANY original peak
-  # type = "any" means any kind of overlap.
-  # select = "all" gives all pairs. We need queryHits to index shifted_gr.
-  # ignore.strand = TRUE because overlaps are purely positional for background exclusion.
-  overlaps_with_original <- GenomicRanges::findOverlaps(
-    shifted_gr,
-    peak_gr,
-    type = "any",
-    select = "all",
-    ignore.strand = TRUE
-  )
+  attempt <- 0
+  while (length(pending_indices) > 0 && attempt < max_retries) {
+    attempt <- attempt + 1
 
-  indices_to_remove <- S4Vectors::queryHits(overlaps_with_original)
-  if (length(indices_to_remove) > 0) {
-    shifted_gr_filtered <- shifted_gr[-indices_to_remove]
-  } else {
-    shifted_gr_filtered <- shifted_gr
+    # Get the subset of peaks that still need background generation
+    current_peaks <- peak_gr[pending_indices]
+
+    # Generate random shift distances for pending peaks
+    rand_distances <- genRNDist(
+      N = length(current_peaks),
+      X = bkg_min_dist,
+      max_dist = bkg_max_dist
+    )
+
+    # Shift peaks (suppress warnings for out-of-bounds shifts)
+    shifted_gr <- suppressWarnings(
+      GenomicRanges::shift(current_peaks, shift = rand_distances)
+    )
+
+    # Track which shifted ranges are valid (not overlapping with original peaks)
+    # We need to check against ALL original peaks, not just pending ones
+    overlaps_with_original <- GenomicRanges::findOverlaps(
+      shifted_gr,
+      peak_gr, # Check against ALL original peaks
+      type = "any",
+      select = "all",
+      ignore.strand = TRUE
+    )
+
+    overlap_indices <- S4Vectors::queryHits(overlaps_with_original)
+    valid_shift_mask <- rep(TRUE, length(shifted_gr))
+    if (length(overlap_indices) > 0) {
+      valid_shift_mask[overlap_indices] <- FALSE
+    }
+
+    # Keep only non-overlapping shifted ranges
+    shifted_gr_filtered <- shifted_gr[valid_shift_mask]
+    corresponding_pending_indices <- pending_indices[valid_shift_mask]
+
+    if (length(shifted_gr_filtered) == 0) {
+      # All shifted ranges overlapped; retry with new shifts
+      next
+    }
+
+    # Get sequences - suppress messages to avoid redundant output
+    background_seqs <- suppressMessages(getSequence(
+      granges_obj = shifted_gr_filtered,
+      genome_obj = genome_obj,
+      extension = c(0, 0),
+      min_length = K
+    ))
+
+    if (length(background_seqs) == 0) {
+      # All sequences failed (boundary trimming, etc.); retry
+      next
+    }
+
+    # Scramble sequences
+    scrambled_seq_list <- lapply(as.list(background_seqs), scrambleDNA)
+    scrambled_seqs <- Biostrings::DNAStringSet(scrambled_seq_list)
+
+    # Filter out empty sequences
+    valid_seq_mask <- Biostrings::width(scrambled_seqs) > 0
+    scrambled_seqs <- scrambled_seqs[valid_seq_mask]
+
+    # The tricky part: we need to know which pending_indices succeeded.
+    # getSequence may drop some ranges, so we track by checking which survived.
+    # Since getSequence doesn't return indices, we approximate by counting successes.
+    # For simplicity, we'll add what we got and update pending_indices proportionally.
+
+    if (length(scrambled_seqs) > 0) {
+      all_scrambled_seqs <- c(all_scrambled_seqs, scrambled_seqs)
+
+      # Remove successfully processed indices from pending
+      # We successfully generated len(scrambled_seqs) sequences out of len(corresponding_pending_indices)
+      # For simplicity, remove the first N pending indices that could have succeeded
+      num_successes <- min(length(scrambled_seqs), length(corresponding_pending_indices))
+      successful_pending <- corresponding_pending_indices[valid_seq_mask[seq_len(sum(valid_shift_mask))]]
+
+      # Update pending_indices: keep only those that didn't produce valid sequences
+      pending_indices <- setdiff(pending_indices, successful_pending[seq_len(num_successes)])
+    }
   }
 
-  if (length(shifted_gr_filtered) == 0) {
-    # No valid non-overlapping regions generated
+  if (length(all_scrambled_seqs) == 0) {
     return(Biostrings::DNAStringSet())
   }
 
-  # Get sequences for the valid background regions
-  # No additional extension (extension = c(0, 0)).
-  # Sequences must be at least K long for countKmers to work.
-  background_seqs_gr <- getSequence(
-    granges_obj = shifted_gr_filtered,
-    genome_obj = genome_obj,
-    extension = c(0, 0),
-    min_length = K # Ensure sequences are viable for K-mer counting
-  )
-
-  if (length(background_seqs_gr) == 0) {
-    # No valid sequences obtained (e.g., all trimmed to < K length)
-    return(Biostrings::DNAStringSet())
-  }
-
-  # Scramble sequences
-  # scrambleDNA works on a single sequence. Use lapply for DNAStringSet.
-  # as.list converts DNAStringSet to a list of individual DNAString objects.
-  scrambled_seq_list <- lapply(as.list(background_seqs_gr), scrambleDNA)
-  final_scrambled_seqs <- Biostrings::DNAStringSet(scrambled_seq_list)
-
-  # Filter out any truly empty sequences that might result if scrambleDNA returned empty
-  # (Our scrambleDNA returns empty DNAString for empty/NA input, which then results in 0-width here)
-  final_scrambled_seqs <- final_scrambled_seqs[Biostrings::width(final_scrambled_seqs) > 0]
-
-  if (length(final_scrambled_seqs) == 0) {
-    return(Biostrings::DNAStringSet())
-  }
-
-  return(final_scrambled_seqs)
+  return(all_scrambled_seqs)
 }
 
 
@@ -845,13 +909,13 @@ generateBkgSet <- function(peak_gr, genome_obj, K,
 #'
 #' @examples
 #' \dontrun{
-#'   test_scores <- c(10, 20, 30, 40, 50, NA)
-#'   normalizeScores(test_scores, method = "min_max")
-#'   normalizeScores(test_scores, method = "min_max", a = 0, b = 10)
-#'   normalizeScores(test_scores, method = "z_score")
-#'   normalizeScores(c(0, 1, 3, 7, 15, NA), method = "log2") # Uses pseudocount = 1
-#'   normalizeScores(c(0, 1, 3, 7, 15), method = "log2", pseudocount = 0.1)
-#'   normalizeScores(test_scores, method = "none") # Returns original scores
+#' test_scores <- c(10, 20, 30, 40, 50, NA)
+#' normalizeScores(test_scores, method = "min_max")
+#' normalizeScores(test_scores, method = "min_max", a = 0, b = 10)
+#' normalizeScores(test_scores, method = "z_score")
+#' normalizeScores(c(0, 1, 3, 7, 15, NA), method = "log2") # Uses pseudocount = 1
+#' normalizeScores(c(0, 1, 3, 7, 15), method = "log2", pseudocount = 0.1)
+#' normalizeScores(test_scores, method = "none") # Returns original scores
 #' }
 normalizeScores <- function(scores, method = "min_max", pseudocount = 1, ...) {
   # Validate scores input
@@ -870,8 +934,7 @@ normalizeScores <- function(scores, method = "min_max", pseudocount = 1, ...) {
   method_upper <- toupper(method)
   additional_args <- list(...)
 
-  normalized_scores <- switch(
-    method_upper,
+  normalized_scores <- switch(method_upper,
     "MIN_MAX" = {
       # Pass additional_args (like a, b) to minmaxNorm
       # minmaxNorm has defaults a=0, b=1 if not provided in ...
@@ -919,8 +982,10 @@ normalizeScores <- function(scores, method = "min_max", pseudocount = 1, ...) {
       scores
     },
     # Default case for switch if method_upper is not matched
-    stop("Unsupported normalization method: '", method,
-         "'. Supported methods are 'min_max', 'z_score', 'log2', 'none'.")
+    stop(
+      "Unsupported normalization method: '", method,
+      "'. Supported methods are 'min_max', 'z_score', 'log2', 'none'."
+    )
   )
   return(normalized_scores)
 }

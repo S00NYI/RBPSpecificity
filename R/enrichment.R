@@ -149,7 +149,6 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
 }
 
 
-
 #' Calculate Background-Corrected K-mer Enrichment
 #'
 #' @description Calculates enrichment scores by comparing K-mer counts from
@@ -278,6 +277,12 @@ calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
 #' @param bkg_max_dist Integer, the maximum distance for shifting peaks. Default: 1000.
 #' @param nucleic_acid_type Character string, "DNA" or "RNA". Determines the alphabet
 #'   for K-mer generation. Default: "DNA".
+#' @param background_type Character string, "local" (default) or "global".
+#'   "local" generates a background by shifting and scrambling peak regions.
+#'   "global" uses pre-calculated counts from genomic regions (e.g., WholeGenome).
+#' @param global_background_region Character string, the region to use for global
+#'   background. Supported: "WholeGenome" (default), "5UTR", "CDS", "3UTR", "introns", "exons".
+#'   Only used if `background_type = "global"`.
 #' @param ... Additional arguments passed to `normalizeScores()` (e.g., `a=0, b=1`
 #'   for min-max normalization).
 #'
@@ -294,9 +299,11 @@ calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
 #'   coordinates = my_coords_df,
 #'   species_or_build = "hg38",
 #'   K = 5,
-#'   extension = c(25, 0),  # Extend 25nt from 5'-end only
+#'   extension = c(25, 0), # Extend 25nt from 5'-end only
 #'   enrichment_method = "subtract",
-#'   normalization_method = "min_max"
+#'   normalization_method = "min_max",
+#'   background_type = "global",
+#'   global_background_region = "3UTR"
 #' )
 #'
 #' head(enrichment_results)
@@ -312,6 +319,8 @@ motifEnrichment <- function(coordinates,
                             bkg_min_dist = 500,
                             bkg_max_dist = 1000,
                             nucleic_acid_type = "DNA",
+                            background_type = "local",
+                            global_background_region = "WholeGenome",
                             ...) {
   # --- 1. Input Validation and Setup ---
   message("--- Phase 1: Initializing and Validating Inputs ---")
@@ -359,16 +368,58 @@ motifEnrichment <- function(coordinates,
 
   # --- 3. Background Calculation ---
   message("\n--- Phase 3: Generating Background Profile ---")
-  bkg_kmer_counts <- countKmersBkg(
-    original_peak_gr = peak_gr,
-    K = K,
-    type = nucleic_acid_type,
-    genome_obj = genome_obj,
-    bkg_min_dist = bkg_min_dist,
-    bkg_iter = bkg_iter,
-    bkg_max_dist = bkg_max_dist
-  )
-  message("Generated average background K-mer profile.")
+  background_type_lower <- tolower(background_type)
+
+  if (background_type_lower == "local") {
+    bkg_kmer_counts <- countKmersBkg(
+      original_peak_gr = peak_gr,
+      K = K,
+      type = nucleic_acid_type,
+      genome_obj = genome_obj,
+      bkg_min_dist = bkg_min_dist,
+      bkg_iter = bkg_iter,
+      bkg_max_dist = bkg_max_dist
+    )
+    message("Generated average background K-mer profile using local shifting.")
+  } else if (background_type_lower == "global") {
+    bkg_file <- paste0("motif_counts_", K, "mer.txt")
+
+    # Resolve path: first check installed package, then local development folder
+    bkg_path <- system.file("extdata", bkg_file, package = "RBPSpecificity")
+    if (bkg_path == "") {
+      # Fallback for local development/testing before installation
+      bkg_path <- file.path("inst", "extdata", bkg_file)
+    }
+
+    if (!file.exists(bkg_path)) {
+      stop("Global background file '", bkg_file, "' not found in inst/extdata or package extdata.")
+    }
+
+    message("Loading global background from '", bkg_path, "' for region: ", global_background_region)
+    bkg_data <- utils::read.table(bkg_path, header = TRUE, sep = "\t", stringsAsFactors = FALSE, check.names = FALSE)
+
+    if (!(global_background_region %in% colnames(bkg_data))) {
+      stop(
+        "Region '", global_background_region, "' not found in global background file. ",
+        "Available regions: ", paste(colnames(bkg_data)[-1], collapse = ", ")
+      )
+    }
+
+    bkg_kmer_counts <- data.frame(
+      MOTIF = bkg_data$Motif,
+      AVG_BKG_COUNT = bkg_data[[global_background_region]],
+      stringsAsFactors = FALSE
+    )
+
+    # Convert motifs to RNA if requested
+    if (toupper(nucleic_acid_type) == "RNA") {
+      bkg_kmer_counts$MOTIF <- gsub("T", "U", bkg_kmer_counts$MOTIF)
+    }
+
+    message("Successfully loaded global background profile.")
+  } else {
+    stop("Invalid 'background_type': must be 'local' or 'global'.")
+  }
 
   # --- 4. Enrichment and Normalization ---
   message("\n--- Phase 4: Calculating Final Enrichment Scores ---")
@@ -399,4 +450,3 @@ motifEnrichment <- function(coordinates,
 }
 
 #-------------------------------------------------------------------------------
-

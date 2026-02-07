@@ -685,7 +685,7 @@ countKmers <- function(sequences, K, type = "DNA") {
   if (!is.numeric(K) || length(K) != 1 || K <= 0 || K %% 1 != 0) {
     stop("'K' must be a single positive integer.")
   }
-  if (K > 12) { # Practical warning for very large K that might create huge combinations
+  if (K > 12) { # Practical warning for very large K
     warning("'K' is ", K, ", generating all K-mer combinations can be memory/time intensive.")
   }
 
@@ -694,54 +694,27 @@ countKmers <- function(sequences, K, type = "DNA") {
     stop("'type' must be a single character string ('DNA' or 'RNA').")
   }
   type_upper <- toupper(type)
-  selected_nucleotides <- switch(type_upper,
-    "DNA" = c("A", "C", "G", "T"),
-    "RNA" = c("A", "C", "G", "U"),
+  if (!(type_upper %in% c("DNA", "RNA"))) {
     stop("Invalid 'type': must be 'DNA' or 'RNA'. Received: '", type, "'")
-  )
-
-  # Generate all possible K-mers based on the selected alphabet and K
-  # This list will be in uppercase.
-  # If type is RNA, this produces motifs with 'U'.
-  kmer_grid <- base::expand.grid(replicate(K, selected_nucleotides, simplify = FALSE))
-  all_kmers_vector <- do.call(paste0, kmer_grid)
-
-  # Handle edge case: empty sequences or all sequences shorter than K
-  # S4Vectors::elementNROWS gets individual sequence lengths in a DNAStringSet
-  if (length(sequences) == 0 || all(S4Vectors::elementNROWS(sequences) < K)) {
-    message(
-      "Input 'sequences' is empty or all sequences are shorter than K (", K, "). ",
-      "Returning all possible K-mers with counts of 0."
-    )
-    return(data.frame(MOTIF = all_kmers_vector, COUNT = 0L, stringsAsFactors = FALSE))
   }
 
-  # Create PDict (Pattern Dictionary)
-  # Biostrings::PDict supports DNAStringSet but NOT RNAStringSet.
-  # If we have RNA motifs (with 'U'), we map them to DNA (replace U with T)
-  # for the purpose of searching against the genomic sequences (which are returned
-  # as DNAStringSet by getSequence/BSgenome).
-
-  if (type_upper == "RNA") {
-    # Map U -> T for the dictionary creation only.
-    # The results_df will still use the original 'all_kmers_vector' with 'U'.
-    search_kmers_vector <- gsub("U", "T", all_kmers_vector)
-    kmer_pdict <- Biostrings::PDict(search_kmers_vector)
-  } else {
-    # DNA: use directly
-    kmer_pdict <- Biostrings::PDict(all_kmers_vector)
-  }
-
-  # Count K-mers
-  # collapse = TRUE sums counts over all sequences in the DNAStringSet
-  kmer_counts <- Biostrings::vcountPDict(kmer_pdict, sequences, collapse = 1L) # Use 1L for integer
+  # oligonucleotideFrequency returns a matrix with length(sequences) rows.
+  # colSums sums counts over all sequences in the DNAStringSet.
+  # This returns counts for all possible K-mers of length K in the alphabet.
+  kmer_counts <- colSums(Biostrings::oligonucleotideFrequency(sequences, width = K))
 
   # Create and return results data frame
   results_df <- data.frame(
-    MOTIF = all_kmers_vector, # Character vector of all possible K-mers (with U if RNA)
-    COUNT = as.integer(kmer_counts), # Ensure counts are integer
+    MOTIF = names(kmer_counts),
+    COUNT = as.integer(kmer_counts),
     stringsAsFactors = FALSE
   )
+
+  # If type is RNA, replace T with U in motifs
+  if (type_upper == "RNA") {
+    results_df$MOTIF <- gsub("T", "U", results_df$MOTIF)
+  }
+
   return(results_df)
 }
 

@@ -30,3 +30,5 @@ test_res_*.csv
 vignettes/*.R
 vignettes/*.html
 vignettes/*_files/
+
+alpha_build_test.R

@@ -16,6 +16,8 @@ motifEnrichment(
   bkg_min_dist = 500,
   bkg_max_dist = 1000,
   nucleic_acid_type = "DNA",
+  background_type = "local",
+  global_background_region = "WholeGenome",
   ...
 )
 }
@@ -53,6 +55,18 @@ creating background regions. Default: 500.}
 \item{nucleic_acid_type}{Character string, "DNA" or "RNA". Determines the alphabet
 for K-mer generation. Default: "DNA".}
 
+\item{background_type}{Character string, "local" (default) or "global".
+- "local": Generates background by shifting and scrambling peak regions from
+  the provided `genome_obj`.
+- "global": Uses pre-calculated motif counts from specific genomic regions
+  stored in the package (supporting K=4, 5, 6, 7).
+If `global_background_region` is explicitly provided, this defaults to "global".}
+
+\item{global_background_region}{Character string, the region to use for global
+background. Supported: "WholeGenome" (default), "5UTR", "CDS", "3UTR", "introns", "exons".
+Providing this argument will automatically switch `background_type` to "global"
+unless otherwise specified.}
+
 \item{...}{Additional arguments passed to `normalizeScores()` (e.g., `a=0, b=1`
 for min-max normalization).}
 }
@@ -78,18 +92,18 @@ The workflow proceeds as follows:
 }
 \examples{
 \dontrun{
-# This is a conceptual example, as it requires real data and a BSgenome package.
-# Assume 'my_coords_df' is a data frame with chr, start, end columns.
+# Option 1: Using Local Background (default)
+res_local <- motifEnrichment(my_coords, "hg38", K = 5)
 
-enrichment_results <- motifEnrichment(
-  coordinates = my_coords_df,
+# Option 2: Using Global Background (automatically switched by providing region)
+res_global <- motifEnrichment(my_coords, "hg38", K = 5, global_background_region = "5UTR")
+
+# Option 3: Explicit Global Background
+res_global_explicit <- motifEnrichment(
+  coordinates = my_coords,
   species_or_build = "hg38",
   K = 5,
-  extension = c(25, 0),  # Extend 25nt from 5'-end only
-  enrichment_method = "subtract",
-  normalization_method = "min_max"
+  background_type = "global"
 )
-
-head(enrichment_results)
 }
 }

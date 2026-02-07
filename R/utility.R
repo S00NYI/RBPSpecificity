@@ -721,9 +721,9 @@ countKmers <- function(sequences, K, type = "DNA") {
 
 #' Generate a Single Set of Background Sequences
 #'
-#' @description Creates one set of scrambled background sequences by randomly
+#' @description Creates one set of background sequences by randomly
 #'   shifting original peak locations, removing overlaps with original peaks,
-#'   extracting sequences, and then scrambling them.
+#'   and extracting sequences. Optionally scrambles the sequences.
 #'
 #' @param peak_gr A GRanges object representing the original genomic peaks.
 #' @param genome_obj A BSgenome object from which sequences will be extracted.
@@ -733,8 +733,10 @@ countKmers <- function(sequences, K, type = "DNA") {
 #'   peaks should be shifted. Passed as `X` to `genRNDist()`.
 #' @param bkg_max_dist Integer, the maximum absolute distance (in base pairs)
 #'   for shifting peaks. Passed as `max_dist` to `genRNDist()`.
+#' @param scramble Logical, if TRUE (default), scrambles the background sequences
+#'   after extraction. Set to FALSE for faster execution when scrambling is not needed.
 #'
-#' @return A DNAStringSet object of one set of scrambled background sequences.
+#' @return A DNAStringSet object of background sequences (scrambled or not).
 #'   Returns an empty DNAStringSet if no valid background regions/sequences
 #'   could be generated.
 #'
@@ -745,7 +747,7 @@ countKmers <- function(sequences, K, type = "DNA") {
 #'
 #' @keywords internal
 generateBkgSet <- function(peak_gr, genome_obj, K,
-                           bkg_min_dist, bkg_max_dist) {
+                           bkg_min_dist, bkg_max_dist, scramble = TRUE) {
   # Input Validation
   if (!methods::is(peak_gr, "GRanges") || length(peak_gr) == 0) {
     stop("'peak_gr' must be a non-empty GRanges object in generateBkgSet.")
@@ -807,21 +809,26 @@ generateBkgSet <- function(peak_gr, genome_obj, K,
     return(Biostrings::DNAStringSet())
   }
 
-  # Scramble sequences
-  # scrambleDNA works on a single sequence. Use lapply for DNAStringSet.
-  # as.list converts DNAStringSet to a list of individual DNAString objects.
-  scrambled_seq_list <- lapply(as.list(background_seqs_gr), scrambleDNA)
-  final_scrambled_seqs <- Biostrings::DNAStringSet(scrambled_seq_list)
+  # Conditionally scramble sequences
+  if (scramble) {
+    # scrambleDNA works on a single sequence. Use lapply for DNAStringSet.
+    # as.list converts DNAStringSet to a list of individual DNAString objects.
+    scrambled_seq_list <- lapply(as.list(background_seqs_gr), scrambleDNA)
+    final_seqs <- Biostrings::DNAStringSet(scrambled_seq_list)
+  } else {
+    # Use unscrambled shifted sequences
+    final_seqs <- background_seqs_gr
+  }
 
   # Filter out any truly empty sequences that might result if scrambleDNA returned empty
   # (Our scrambleDNA returns empty DNAString for empty/NA input, which then results in 0-width here)
-  final_scrambled_seqs <- final_scrambled_seqs[Biostrings::width(final_scrambled_seqs) > 0]
+  final_seqs <- final_seqs[Biostrings::width(final_seqs) > 0]
 
-  if (length(final_scrambled_seqs) == 0) {
+  if (length(final_seqs) == 0) {
     return(Biostrings::DNAStringSet())
   }
 
-  return(final_scrambled_seqs)
+  return(final_seqs)
 }
 
 

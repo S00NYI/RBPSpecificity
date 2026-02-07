@@ -15,6 +15,7 @@ motifEnrichment(
   bkg_iter = 100,
   bkg_min_dist = 500,
   bkg_max_dist = 1000,
+  scramble_bkg = TRUE,
   nucleic_acid_type = "DNA",
   background_type = "local",
   global_background_region = "WholeGenome",
@@ -52,12 +53,14 @@ creating background regions. Default: 500.}
 
 \item{bkg_max_dist}{Integer, the maximum distance for shifting peaks. Default: 1000.}
 
+\item{scramble_bkg}{Logical, if TRUE (default), scrambles background sequences after
+shifting. Set to FALSE for faster execution when using local background only.}
+
 \item{nucleic_acid_type}{Character string, "DNA" or "RNA". Determines the alphabet
 for K-mer generation. Default: "DNA".}
 
 \item{background_type}{Character string, "local" (default) or "global".
-- "local": Generates background by shifting and scrambling peak regions from
-  the provided `genome_obj`.
+- "local": Generates background by shifting (and optionally scrambling) peak regions.
 - "global": Uses pre-calculated motif counts from specific genomic regions
   stored in the package (supporting K=4, 5, 6, 7).
 If `global_background_region` is explicitly provided, this defaults to "global".}
@@ -92,13 +95,16 @@ The workflow proceeds as follows:
 }
 \examples{
 \dontrun{
-# Option 1: Using Local Background (default)
+# Option 1: Using Local Background (default, with scrambling)
 res_local <- motifEnrichment(my_coords, "hg38", K = 5)
 
-# Option 2: Using Global Background (automatically switched by providing region)
+# Option 2: Using Local Background without scrambling (faster)
+res_local_fast <- motifEnrichment(my_coords, "hg38", K = 5, scramble_bkg = FALSE)
+
+# Option 3: Using Global Background (automatically switched by providing region)
 res_global <- motifEnrichment(my_coords, "hg38", K = 5, global_background_region = "5UTR")
 
-# Option 3: Explicit Global Background
+# Option 4: Explicit Global Background
 res_global_explicit <- motifEnrichment(
   coordinates = my_coords,
   species_or_build = "hg38",

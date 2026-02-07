@@ -278,11 +278,15 @@ calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
 #' @param nucleic_acid_type Character string, "DNA" or "RNA". Determines the alphabet
 #'   for K-mer generation. Default: "DNA".
 #' @param background_type Character string, "local" (default) or "global".
-#'   "local" generates a background by shifting and scrambling peak regions.
-#'   "global" uses pre-calculated counts from genomic regions (e.g., WholeGenome).
+#'   - "local": Generates background by shifting and scrambling peak regions from
+#'     the provided `genome_obj`.
+#'   - "global": Uses pre-calculated motif counts from specific genomic regions
+#'     stored in the package (supporting K=4, 5, 6, 7).
+#'   If `global_background_region` is explicitly provided, this defaults to "global".
 #' @param global_background_region Character string, the region to use for global
 #'   background. Supported: "WholeGenome" (default), "5UTR", "CDS", "3UTR", "introns", "exons".
-#'   Only used if `background_type = "global"`.
+#'   Providing this argument will automatically switch `background_type` to "global"
+#'   unless otherwise specified.
 #' @param ... Additional arguments passed to `normalizeScores()` (e.g., `a=0, b=1`
 #'   for min-max normalization).
 #'
@@ -292,21 +296,19 @@ calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
 #'
 #' @examples
 #' \dontrun{
-#' # This is a conceptual example, as it requires real data and a BSgenome package.
-#' # Assume 'my_coords_df' is a data frame with chr, start, end columns.
+#' # Option 1: Using Local Background (default)
+#' res_local <- motifEnrichment(my_coords, "hg38", K = 5)
 #'
-#' enrichment_results <- motifEnrichment(
-#'   coordinates = my_coords_df,
+#' # Option 2: Using Global Background (automatically switched by providing region)
+#' res_global <- motifEnrichment(my_coords, "hg38", K = 5, global_background_region = "5UTR")
+#'
+#' # Option 3: Explicit Global Background
+#' res_global_explicit <- motifEnrichment(
+#'   coordinates = my_coords,
 #'   species_or_build = "hg38",
 #'   K = 5,
-#'   extension = c(25, 0), # Extend 25nt from 5'-end only
-#'   enrichment_method = "subtract",
-#'   normalization_method = "min_max",
-#'   background_type = "global",
-#'   global_background_region = "3UTR"
+#'   background_type = "global"
 #' )
-#'
-#' head(enrichment_results)
 #' }
 motifEnrichment <- function(coordinates,
                             species_or_build,
@@ -322,7 +324,13 @@ motifEnrichment <- function(coordinates,
                             background_type = "local",
                             global_background_region = "WholeGenome",
                             ...) {
-  # --- 1. Input Validation and Setup ---
+  # --- 1. Input Validation and Logic Setup ---
+  # If the user provided a global region but didn't specify background_type,
+  # assume they want global background.
+  if (!missing(global_background_region) && missing(background_type)) {
+    background_type <- "global"
+  }
+
   message("--- Phase 1: Initializing and Validating Inputs ---")
   if (missing(coordinates) || missing(species_or_build) || missing(K)) {
     stop("Arguments 'coordinates', 'species_or_build', and 'K' are required.")

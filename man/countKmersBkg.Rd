@@ -13,7 +13,8 @@ countKmersBkg(
   bkg_iter = 100,
   bkg_max_dist = 1000,
   internal_min_length_for_bkg_seqs = K,
-  scramble_bkg = TRUE
+  scramble_bkg = TRUE,
+  chunk_size = NULL
 )
 }
 \arguments{

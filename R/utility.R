@@ -90,6 +90,33 @@ scrambleDNA <- function(seq) {
 }
 
 
+#' Scramble a Set of DNA Sequences
+#'
+#' @description Vectorized version of \code{\link{scrambleDNA}} that operates on
+#'   an entire DNAStringSet. More efficient than applying scrambleDNA element-wise
+#'   because it avoids N individual DNAString constructor calls, constructing one
+#'   DNAStringSet from a character vector at the end.
+#'
+#' @param dna_set A DNAStringSet object.
+#'
+#' @return A DNAStringSet object with each sequence independently shuffled.
+#'   Returns an empty DNAStringSet if input is empty.
+#' @importFrom Biostrings DNAStringSet
+#' @keywords internal
+scrambleDNASet <- function(dna_set) {
+  if (length(dna_set) == 0) return(Biostrings::DNAStringSet())
+
+  char_seqs <- as.character(dna_set)
+  scrambled <- vapply(char_seqs, function(s) {
+    if (is.na(s) || nchar(s) == 0) return("")
+    chars <- strsplit(s, "")[[1]]
+    paste0(sample(chars), collapse = "")
+  }, character(1), USE.NAMES = FALSE)
+
+  Biostrings::DNAStringSet(scrambled)
+}
+
+
 #' Generate Random Genomic Distances
 #'
 #' @description Generates N random distances, ensuring a minimum separation from zero.
@@ -829,6 +856,108 @@ generateBkgSet <- function(peak_gr, genome_obj, K,
   }
 
   return(final_seqs)
+}
+
+
+#' Generate Batched Background Sequences Across Multiple Iterations
+#'
+#' @description Batched version of \code{\link{generateBkgSet}} that processes
+#'   multiple iterations at once, reducing per-call overhead for GRanges shifting,
+#'   overlap removal, and sequence extraction.
+#'
+#' @param peak_gr A GRanges object representing the original genomic peaks.
+#' @param genome_obj A BSgenome object.
+#' @param min_seq_length Integer, minimum length for extracted sequences.
+#' @param bkg_min_dist Integer, minimum absolute shift distance.
+#' @param bkg_max_dist Integer, maximum absolute shift distance.
+#' @param scramble Logical, whether to scramble sequences.
+#' @param n_iter Integer, number of iterations to batch.
+#'
+#' @return A list with two elements:
+#'   \describe{
+#'     \item{sequences}{A DNAStringSet of all background sequences.}
+#'     \item{iter_tags}{Integer vector of iteration indices (1 to n_iter),
+#'       same length as sequences, indicating which iteration each sequence
+#'       belongs to.}
+#'   }
+#' @importFrom GenomicRanges shift findOverlaps trim width
+#' @importFrom GenomeInfoDb seqlevels seqlevelsInUse seqlengths seqlengths<- seqnames keepSeqlevels
+#' @importFrom Biostrings getSeq DNAStringSet width
+#' @importFrom S4Vectors queryHits
+#' @importFrom methods is
+#' @keywords internal
+generateBkgSetBatched <- function(peak_gr, genome_obj, min_seq_length,
+                                   bkg_min_dist, bkg_max_dist,
+                                   scramble, n_iter) {
+  empty_result <- list(sequences = Biostrings::DNAStringSet(), iter_tags = integer(0))
+  num_peaks <- length(peak_gr)
+  total_regions <- num_peaks * n_iter
+
+  # 1. Replicate peaks and tag with iteration index
+  batched_gr <- rep(peak_gr, times = n_iter)
+  iter_tags <- rep(seq_len(n_iter), each = num_peaks)
+
+  # 2. Generate all random distances and shift at once
+  rand_distances <- genRNDist(N = total_regions, X = bkg_min_dist, max_dist = bkg_max_dist)
+  shifted_gr <- suppressWarnings(GenomicRanges::shift(batched_gr, shift = rand_distances))
+
+  # 3. Remove shifted regions overlapping with original peaks
+  overlaps <- GenomicRanges::findOverlaps(
+    shifted_gr, peak_gr,
+    type = "any", select = "all", ignore.strand = TRUE
+  )
+  indices_to_remove <- unique(S4Vectors::queryHits(overlaps))
+  if (length(indices_to_remove) > 0) {
+    keep_idx <- setdiff(seq_along(shifted_gr), indices_to_remove)
+    shifted_gr <- shifted_gr[keep_idx]
+    iter_tags <- iter_tags[keep_idx]
+  }
+  if (length(shifted_gr) == 0) return(empty_result)
+
+  # 4. Filter to valid seqlevels present in genome
+  valid_seqlevels <- intersect(
+    GenomeInfoDb::seqlevelsInUse(shifted_gr),
+    GenomeInfoDb::seqlevels(genome_obj)
+  )
+  if (length(valid_seqlevels) < length(GenomeInfoDb::seqlevelsInUse(shifted_gr))) {
+    keep_sl <- as.character(GenomeInfoDb::seqnames(shifted_gr)) %in% valid_seqlevels
+    shifted_gr <- shifted_gr[keep_sl]
+    iter_tags <- iter_tags[keep_sl]
+  }
+  if (length(shifted_gr) == 0) return(empty_result)
+
+  # Set seqlengths for trim
+  shifted_gr <- GenomeInfoDb::keepSeqlevels(shifted_gr, valid_seqlevels, pruning.mode = "tidy")
+  genome_sl <- GenomeInfoDb::seqlengths(genome_obj)[GenomeInfoDb::seqlevels(shifted_gr)]
+  genome_sl <- genome_sl[!is.na(genome_sl)]
+  common_sl <- intersect(names(genome_sl), GenomeInfoDb::seqlevels(shifted_gr))
+  if (length(common_sl) > 0) {
+    GenomeInfoDb::seqlengths(shifted_gr)[common_sl] <- genome_sl[common_sl]
+  }
+
+  # 5. Trim to chromosome boundaries and filter by min length
+  shifted_gr <- GenomicRanges::trim(shifted_gr)
+  valid_width <- GenomicRanges::width(shifted_gr) >= min_seq_length
+  if (any(!valid_width)) {
+    shifted_gr <- shifted_gr[valid_width]
+    iter_tags <- iter_tags[valid_width]
+  }
+  if (length(shifted_gr) == 0) return(empty_result)
+
+  # 6. Extract sequences directly (no metadata handling needed for background)
+  sequences <- Biostrings::getSeq(genome_obj, shifted_gr)
+
+  # 7. Scramble if requested
+  if (scramble) {
+    sequences <- scrambleDNASet(sequences)
+    valid_after <- Biostrings::width(sequences) > 0
+    if (any(!valid_after)) {
+      sequences <- sequences[valid_after]
+      iter_tags <- iter_tags[valid_after]
+    }
+  }
+
+  list(sequences = sequences, iter_tags = iter_tags)
 }
 
 

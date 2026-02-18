@@ -40,13 +40,12 @@
 #' @keywords internal # Helper for the main motifEnrichment function
 countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
                           bkg_min_dist = 500, bkg_iter = 100, bkg_max_dist = 1000,
-                          internal_min_length_for_bkg_seqs = K, scramble_bkg = TRUE) {
-  # Input Validation for parameters specific to this function
+                          internal_min_length_for_bkg_seqs = K, scramble_bkg = TRUE,
+                          chunk_size = NULL) {
+  # --- Input Validation ---
   if (!methods::is(original_peak_gr, "GRanges") || length(original_peak_gr) == 0) {
     stop("'original_peak_gr' must be a non-empty GRanges object.")
   }
-  # K, type, genome_obj, bkg_min_dist, bkg_max_dist will be validated by downstream functions
-  # like countKmers, generateBkgSet, genRNDist.
   if (!is.numeric(bkg_iter) || length(bkg_iter) != 1 || bkg_iter <= 0 || bkg_iter %% 1 != 0) {
     stop("'bkg_iter' must be a single positive integer.")
   }
@@ -63,72 +62,89 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
 
   message("Note: During background generation, any regions shorter than K=", K, " will be removed.")
 
-  # Get the template of all possible K-mers to define rows and order
-  # Call countKmers with an empty DNAStringSet to get the MOTIF column structure
+  # --- Auto-calculate chunk_size for memory safety ---
+  if (is.null(chunk_size)) {
+    num_peaks <- length(original_peak_gr)
+    num_kmers <- 4^K
+    # Target ~1 GB for the oligonucleotideFrequency matrix
+    # Matrix size per iteration = num_peaks * num_kmers * 4 bytes (integer)
+    bytes_per_iter <- as.numeric(num_peaks) * num_kmers * 4
+    if (bytes_per_iter > 0) {
+      chunk_size <- max(1L, as.integer(floor(1e9 / bytes_per_iter)))
+    } else {
+      chunk_size <- bkg_iter
+    }
+    chunk_size <- min(chunk_size, bkg_iter)
+  }
+
+  # --- Template k-mers ---
   template_kmers_df <- suppressMessages(countKmers(sequences = Biostrings::DNAStringSet(), K = K, type = type))
   all_kmers_vector <- template_kmers_df$MOTIF
 
-  if (length(all_kmers_vector) == 0 && K > 0) { # K=0 is invalid, caught by countKmers
+  if (length(all_kmers_vector) == 0 && K > 0) {
     stop("Could not generate the K-mer universe template. Check K and type parameters for countKmers.")
   }
 
-  # Matrix to store K-mer counts for each iteration
-  # Rows: K-mers, Columns: Iterations
-  # Initialize with 0s. dimnames ensures row order matches all_kmers_vector.
+  # --- Accumulator matrix ---
   counts_accumulator_matrix <- matrix(0L,
     nrow = length(all_kmers_vector),
     ncol = bkg_iter,
     dimnames = list(all_kmers_vector, NULL)
   )
 
-  valid_iterations_count <- 0 # Track iterations that yielded actual sequences for counting
+  valid_iterations_count <- 0
 
-  message("Generating average background K-mer profile over ", bkg_iter, " iterations:")
+  message("Generating average background K-mer profile over ", bkg_iter,
+          " iterations (chunk_size=", chunk_size, "):")
   pb <- utils::txtProgressBar(min = 0, max = bkg_iter, style = 3)
 
-  for (i in seq_len(bkg_iter)) {
-    # Generate one set of background sequences (scrambled if scramble_bkg=TRUE)
-    # K for generateBkgSet is its internal min_length for getSequence
-    one_bkg_dna_set <- generateBkgSet(
+  # --- Process in chunks ---
+  chunk_starts <- seq(1L, bkg_iter, by = chunk_size)
+
+  for (cs in chunk_starts) {
+    chunk_end <- min(cs + chunk_size - 1L, bkg_iter)
+    n_this_chunk <- chunk_end - cs + 1L
+
+    # Batched background generation for this chunk
+    bkg_result <- generateBkgSetBatched(
       peak_gr = original_peak_gr,
       genome_obj = genome_obj,
-      K = internal_min_length_for_bkg_seqs, # This K is for sequence length in getSequence
+      min_seq_length = internal_min_length_for_bkg_seqs,
       bkg_min_dist = bkg_min_dist,
       bkg_max_dist = bkg_max_dist,
-      scramble = scramble_bkg
+      scramble = scramble_bkg,
+      n_iter = n_this_chunk
     )
 
-    # If sequences were generated, count K-mers
-    if (length(one_bkg_dna_set) > 0) {
-      # Check if all sequences in the set are long enough for K-mer counting
-      # (generateBkgSet should ensure this via getSequence's min_length, but double check concept)
-      # Actually, countKmers itself handles sequences shorter than K by not finding K-mers in them.
-      iter_counts_df <- countKmers(sequences = one_bkg_dna_set, K = K, type = type) # This K is for K-mer counting
+    if (length(bkg_result$sequences) > 0) {
+      # One oligonucleotideFrequency call for entire chunk
+      freq_matrix <- Biostrings::oligonucleotideFrequency(bkg_result$sequences, width = K)
 
-      # Ensure the motifs from iter_counts_df match the order in all_kmers_vector
-      # (countKmers should always return them in a consistent order based on expand.grid)
-      if (identical(iter_counts_df$MOTIF, all_kmers_vector)) {
-        counts_accumulator_matrix[, i] <- iter_counts_df$COUNT
-        if (sum(iter_counts_df$COUNT) > 0) { # Consider an iteration valid if it produced any counts
-          valid_iterations_count <- valid_iterations_count + 1
-        }
-      } else {
-        warning("Motif order mismatch in background iteration ", i, ". This should not happen. Counts for this iteration set to 0.")
-        # Counts remain 0 for this column as initialized
-      }
-    } else {
-      # No background sequences generated in this iteration, counts remain 0.
+      # Grouped sums via rowsum (C-level, very fast)
+      per_iter_sums <- rowsum(freq_matrix, group = bkg_result$iter_tags, reorder = TRUE)
+
+      # Map chunk-local iteration indices to global column indices
+      iter_indices_in_chunk <- as.integer(rownames(per_iter_sums))
+      global_col_indices <- cs + iter_indices_in_chunk - 1L
+
+      # Store in accumulator (columns of freq_matrix match all_kmers_vector order)
+      counts_accumulator_matrix[, global_col_indices] <- t(per_iter_sums)
+
+      # Count valid iterations (those with non-zero total counts)
+      iter_totals <- rowSums(per_iter_sums)
+      valid_iterations_count <- valid_iterations_count + sum(iter_totals > 0)
     }
-    utils::setTxtProgressBar(pb, i)
-  } # End of iterations loop
+
+    utils::setTxtProgressBar(pb, chunk_end)
+  }
   close(pb)
 
+  # --- Averaging and output ---
   if (valid_iterations_count == 0 && bkg_iter > 0) {
     message(
       "\nNOTE: No valid background sequences yielded counts across any of the ", bkg_iter, " iterations. ",
       "Average background counts will be all zeros."
     )
-    # The matrix is already initialized with zeros, so rowMeans will be 0.
   } else if (bkg_iter > 0) {
     message(
       "\nBackground profile generated. Averaged over ", valid_iterations_count,
@@ -136,15 +152,11 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
     )
   }
 
-
-  # Calculate average counts across all iterations
-  # If an iteration yielded no sequences, its column in counts_accumulator_matrix is 0.
-  # This correctly contributes to the average.
-  average_counts <- rowMeans(counts_accumulator_matrix, na.rm = FALSE) # Should be no NAs if initialized with 0L
+  average_counts <- rowMeans(counts_accumulator_matrix, na.rm = FALSE)
 
   results_df <- data.frame(
     MOTIF = all_kmers_vector,
-    AVG_BKG_COUNT = round(average_counts, 4), # Round for tidiness
+    AVG_BKG_COUNT = round(average_counts, 4),
     stringsAsFactors = FALSE
   )
 

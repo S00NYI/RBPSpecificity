@@ -112,6 +112,9 @@ See the [package vignette](vignettes/RBPSpecificity.Rmd) for detailed examples c
 3. Multi-RBP comparison
 4. Visualization options
 
+For detailed usage, see **Figure_Scripts** folder in:
+https://github.com/S00NYI/BITS_Specificity
+
 ## Related Packages
 
 **RBPSpecificity** works alongside [RBPBind](https://github.com/S00NYI/RBPBind), which simulates competitive RBP binding using equilibrium kinetics. Together, these packages enable:
@@ -127,9 +130,8 @@ If you use RBPSpecificity in your research, please cite:
 > *Inherent Specificity and Mutational Sensitivity as Quantitative Metrics for RBP Binding.* 
 > bioRxiv. https://www.biorxiv.org/content/10.1101/2025.03.28.646018v2
 
-## Acknowledgments
-
 This package was developed in part with **Google Antigravity**.
 
-For the original R implementation of RBP specificity analysis, see:
+For the original R implementation of RBP specificity analysis, see **Deprecated** folder in:
 https://github.com/S00NYI/BITS_Specificity
+

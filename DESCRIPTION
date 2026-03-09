@@ -35,6 +35,8 @@ Imports:
     stats,
     utils
 Suggests: 
+    BSgenome.Hsapiens.UCSC.hg38,
+    IRanges,
     knitr,
     rmarkdown,
     testthat

@@ -2,9 +2,9 @@
 
 export(motifEnrichment)
 export(plotIS)
-export(plotMS)
+export(plotVS)
 export(returnIS)
-export(returnMS)
+export(returnVS)
 import(ggplot2)
 importFrom(BSgenome,getBSgenome)
 importFrom(Biostrings,BString)

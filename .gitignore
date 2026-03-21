@@ -20,6 +20,7 @@ test_res_*.csv
 # IDE
 .vscode/
 *.swp
+*.Rproj
 
 # Build artifacts
 *.tar.gz

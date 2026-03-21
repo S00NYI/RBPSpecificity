@@ -1,15 +1,15 @@
-#' Calculate Mutational Sensitivity (MS)
+﻿#' Calculate Variation Sensitivity (VS)
 #'
-#' @description Calculates the Mutational Sensitivity (MS) for a target motif or
-#'   for all motifs. MS reflects how much the enrichment score changes upon
+#' @description Calculates the Variation Sensitivity (VS) for a target motif or
+#'   for all motifs. VS reflects how much the enrichment score changes upon
 #'   single nucleotide variations (SNVs).
 #'
 #' @param motif_enrichment A data frame with 'MOTIF' and 'Score' columns.
 #' @param motif Character string, the reference motif. Only used if
 #'   `return_type = "specific"`. If NULL or "top", the top-scoring motif is used.
 #' @param return_type Character string, either "specific" (default) or "all".
-#'   If "specific", calculates MS for one motif. If "all", calculates an
-#'   average MS score for every motif.
+#'   If "specific", calculates VS for one motif. If "all", calculates an
+#'   average VS score for every motif.
 #' @param output_type Character string, specifying the output format if
 #'   `return_type = "specific"`: "matrix" (default) or "number". Ignored if
 #'   `return_type = "all"`.
@@ -17,9 +17,9 @@
 #'   Default: "1_minus_norm_score".
 #'
 #' @return Depends on inputs:
-#'   - If `return_type = "specific"` and `output_type = "matrix"`: An MS matrix.
-#'   - If `return_type = "specific"` and `output_type = "number"`: A single numeric MS score.
-#'   - If `return_type = "all"`: A data frame with 'MOTIF' and 'MS' columns.
+#'   - If `return_type = "specific"` and `output_type = "matrix"`: A VS matrix.
+#'   - If `return_type = "specific"` and `output_type = "number"`: A single numeric VS score.
+#'   - If `return_type = "all"`: A data frame with 'MOTIF' and 'VS' columns.
 #' @export
 #'
 #' @examples
@@ -28,12 +28,12 @@
 #' scores <- c(100,     50,      40,      30,      60)
 #' df <- data.frame(MOTIF = motifs, Score = scores)
 #' 
-#' # Calculate MS matrix
-#' ms_mat <- returnMS(df, motif = "AAAAA", output_type = "matrix")
+#' # Calculate VS matrix
+#' vs_mat <- returnVS(df, motif = "AAAAA", output_type = "matrix")
 #' 
-#' # Calculate average MS score
-#' ms_score <- returnMS(df, motif = "AAAAA", output_type = "number")
-returnMS <- function(motif_enrichment, motif = NULL, return_type = "specific",
+#' # Calculate average VS score
+#' vs_score <- returnVS(df, motif = "AAAAA", output_type = "number")
+returnVS <- function(motif_enrichment, motif = NULL, return_type = "specific",
                      output_type = "matrix", sensitivity_method = "1_minus_norm_score") {
   # --- Input Validation ---
   if (!is.data.frame(motif_enrichment) || !all(c("MOTIF", "Score") %in% colnames(motif_enrichment))) {
@@ -67,17 +67,17 @@ returnMS <- function(motif_enrichment, motif = NULL, return_type = "specific",
     names(variant_scores) <- all_variants[valid_indices]
 
     if (length(variant_scores) == 0) {
-      warning("No variants of the target motif found. Cannot calculate MS.")
+      warning("No variants of the target motif found. Cannot calculate VS.")
       return(if (output_type == "matrix") NA else NA_real_)
     }
 
     snv_sensitivities <- calSNVSens(reference_score, variant_scores, method = sensitivity_method)
 
     if (output_type == "matrix") {
-      ms_matrix <- formatMS(snv_sensitivities, target_motif, reference_score, kmer_size,
+      vs_matrix <- formatVS(snv_sensitivities, target_motif, reference_score, kmer_size,
                             nucleotides = nucleotides_used, sensitivity_method = sensitivity_method)
-      attr(ms_matrix, "motif_name") <- target_motif
-      return(ms_matrix)
+      attr(vs_matrix, "motif_name") <- target_motif
+      return(vs_matrix)
     } else { # "number"
       score_diff_sensitivities <- calSNVSens(reference_score, variant_scores, method = "score_diff")
       non_zero_sensitivities <- score_diff_sensitivities[score_diff_sensitivities != 0]
@@ -85,14 +85,14 @@ returnMS <- function(motif_enrichment, motif = NULL, return_type = "specific",
     }
 
   } else { # return_type == "all"
-    message("Calculating MS for all ", nrow(motif_enrichment), " motifs. This may take a while...")
+    message("Calculating VS for all ", nrow(motif_enrichment), " motifs. This may take a while...")
 
     is_rna_context <- any(grepl("U", motif_enrichment$MOTIF))
     nucleotides_used <- if (is_rna_context) c('A', 'C', 'G', 'U') else c('A', 'C', 'G', 'T')
     variant_type <- if (is_rna_context) "RNA" else "DNA"
 
     all_motifs <- motif_enrichment$MOTIF
-    ms_values <- numeric(length(all_motifs))
+    vs_values <- numeric(length(all_motifs))
     pb <- utils::txtProgressBar(min = 0, max = length(all_motifs), style = 3)
 
     for (i in seq_along(all_motifs)) {
@@ -107,15 +107,15 @@ returnMS <- function(motif_enrichment, motif = NULL, return_type = "specific",
       if (length(variant_scores) > 0) {
         score_diffs <- reference_score - variant_scores
         non_zero_diffs <- score_diffs[score_diffs != 0]
-        ms_values[i] <- mean(non_zero_diffs, na.rm = TRUE)
+        vs_values[i] <- mean(non_zero_diffs, na.rm = TRUE)
       } else {
-        ms_values[i] <- NA_real_
+        vs_values[i] <- NA_real_
       }
       utils::setTxtProgressBar(pb, i)
     }
     close(pb)
 
-    results_df <- data.frame(MOTIF = all_motifs, MS = ms_values)
+    results_df <- data.frame(MOTIF = all_motifs, VS = vs_values)
     return(results_df)
   }
 }
@@ -164,7 +164,7 @@ calSNVSens <- function(reference_score, variant_scores, method = "1_minus_norm_s
 }
 
 
-#' Format Mutational Sensitivity Scores into a Matrix
+#' Format Variation Sensitivity Scores into a Matrix
 #'
 #' @description Internal helper to arrange SNV sensitivity scores into the
 #' standard Nucleotide x Position matrix format.
@@ -178,10 +178,10 @@ calSNVSens <- function(reference_score, variant_scores, method = "1_minus_norm_s
 #' @return A matrix (rows=nucleotides, cols=positions 1 to K) with sensitivity scores.
 #'   The cell corresponding to the original nucleotide at a position might be NA or 0.
 #' @keywords internal
-formatMS <- function(snv_sensitivity_scores, reference_motif, reference_score, K,
+formatVS <- function(snv_sensitivity_scores, reference_motif, reference_score, K,
                      nucleotides = c('A', 'C', 'G', 'T'), sensitivity_method = "1_minus_norm_score") {
   # Initialize matrix (Nucs x Pos) with NAs
-  ms_matrix <- matrix(NA_real_,
+  vs_matrix <- matrix(NA_real_,
                       nrow = length(nucleotides),
                       ncol = K,
                       dimnames = list(nucleotides, paste0("Pos", seq_len(K))))
@@ -196,7 +196,7 @@ formatMS <- function(snv_sensitivity_scores, reference_motif, reference_score, K
         # The "mutation" is to itself. Calculate sensitivity based on the chosen method.
         # This makes the row for the reference nucleotide consistent.
         self_sens <- calSNVSens(reference_score, reference_score, method = sensitivity_method)
-        ms_matrix[nuc, pos] <- self_sens
+        vs_matrix[nuc, pos] <- self_sens
         next
       }
 
@@ -207,11 +207,12 @@ formatMS <- function(snv_sensitivity_scores, reference_motif, reference_score, K
 
       # Find the sensitivity score for this variant
       if (variant_motif %in% names(snv_sensitivity_scores)) {
-        ms_matrix[nuc, pos] <- snv_sensitivity_scores[[variant_motif]]
+        vs_matrix[nuc, pos] <- snv_sensitivity_scores[[variant_motif]]
       }
     }
   }
-  return(ms_matrix)
+  return(vs_matrix)
 }
 
 #-------------------------------------------------------------------------------
+

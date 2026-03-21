@@ -27,7 +27,7 @@ knitr::opts_chunk$set(
 specificities from high-throughput sequencing data. This package provides tools for:
 
 - Calculating **Inherent Specificity (IS)** from k-mer enrichment data
-- Calculating **Mutational Sensitivity (MS)** for top motifs
+- Calculating **Variation Sensitivity (VS)** for top motifs
 - Visualizing specificity distributions and sensitivity profiles
 - Computing enrichment scores from CLIP peak data
 
@@ -39,8 +39,8 @@ The package implements two key metrics for characterizing RBP binding behavior:
 
 1. **Inherent Specificity (IS)**: Quantifies how specifically an RBP binds its 
    top motif relative to all other motifs. Higher IS indicates more specific binding.
-2. **Mutational Sensitivity (MS)**: Measures how much the binding affinity 
-   changes upon single nucleotide variations in the motif. Higher MS indicates
+2. **Variation Sensitivity (VS)**: Measures how much the binding affinity 
+   changes upon single nucleotide variations in the motif. Higher VS indicates
    greater sensitivity to sequence changes.
 
 These metrics enable quantitative comparison of RBP binding properties across
@@ -95,7 +95,7 @@ library(ggplot2)
 
 # Pre-computed Enrichment Data (RBNS)
 
-This workflow demonstrates how to calculate IS and MS from pre-computed 
+This workflow demonstrates how to calculate IS and VS from pre-computed 
 enrichment scores, such as those from RBNS (RNA Bind-n-Seq) experiments.
 
 ## Loading RBNS Data
@@ -153,22 +153,22 @@ is_all <- returnIS(hnrnpc_rbns, return_type = "all")
 head(is_all[order(-is_all$IS), ], 10)
 ```
 
-## Calculating Mutational Sensitivity (MS)
+## Calculating Variation Sensitivity (VS)
 
-MS quantifies how sensitive an RBP is to single nucleotide changes in its 
+VS quantifies how sensitive an RBP is to single nucleotide changes in its 
 preferred motif.
 
 ```{r calc-ms}
-# Get MS as a matrix (shows sensitivity at each position)
-ms_matrix <- returnMS(hnrnpc_rbns, output_type = "matrix")
-print(ms_matrix)
+# Get VS as a matrix (shows sensitivity at each position)
+vs_matrix <- returnVS(hnrnpc_rbns, output_type = "matrix")
+print(vs_matrix)
 
-# Get MS as a single number (average sensitivity)
-ms_hnrnpc <- returnMS(hnrnpc_rbns, output_type = "number")
-ms_eif4g2 <- returnMS(eif4g2_rbns, output_type = "number")
+# Get VS as a single number (average sensitivity)
+vs_hnrnpc <- returnVS(hnrnpc_rbns, output_type = "number")
+vs_eif4g2 <- returnVS(eif4g2_rbns, output_type = "number")
 
-message("HNRNPC MS: ", round(ms_hnrnpc, 4))
-message("EIF4G2 MS: ", round(ms_eif4g2, 4))
+message("HNRNPC VS: ", round(vs_hnrnpc, 4))
+message("EIF4G2 VS: ", round(vs_eif4g2, 4))
 ```
 
 ## Visualization
@@ -188,17 +188,17 @@ You can adjust the number of histogram bins with the `bins` parameter:
 plotIS(eif4g2_rbns, bins = 30)
 ```
 
-### MS Profile Plot
+### VS Profile Plot
 
-The `plotMS()` function visualizes how sensitive binding is to mutations at each 
-position. Here we compare MS profiles for both RBPs:
+The `plotVS()` function visualizes how sensitive binding is to mutations at each 
+position. Here we compare VS profiles for both RBPs:
 
-```{r plot-ms-hnrnpc, fig.cap="Mutational sensitivity profile for HNRNPC (high specificity RBP)."}
-plotMS(hnrnpc_rbns)
+```{r plot-vs-hnrnpc, fig.cap="Variation sensitivity profile for HNRNPC (high specificity RBP)."}
+plotVS(hnrnpc_rbns)
 ```
 
-```{r plot-ms-eif4g2, fig.cap="Mutational sensitivity profile for EIF4G2 (low specificity RBP)."}
-plotMS(eif4g2_rbns)
+```{r plot-vs-eif4g2, fig.cap="Variation sensitivity profile for EIF4G2 (low specificity RBP)."}
+plotVS(eif4g2_rbns)
 ```
 
 # De Novo Enrichment from Peaks (eCLIP)
@@ -285,15 +285,15 @@ head(eif4g2_enrichment[order(-eif4g2_enrichment$Score), ], 10)
 ## Calculating Metrics from Enrichment
 
 ```{r eclip-metrics, eval=FALSE}
-# Calculate IS and MS from enrichment data
+# Calculate IS and VS from enrichment data
 is_eclip_hnrnpc <- returnIS(hnrnpc_enrichment)
-ms_eclip_hnrnpc <- returnMS(hnrnpc_enrichment, output_type = "number")
+vs_eclip_hnrnpc <- returnVS(hnrnpc_enrichment, output_type = "number")
 
 is_eclip_eif4g2 <- returnIS(eif4g2_enrichment)
-ms_eclip_eif4g2 <- returnMS(eif4g2_enrichment, output_type = "number")
+vs_eclip_eif4g2 <- returnVS(eif4g2_enrichment, output_type = "number")
 
-message("HNRNPC eCLIP - IS: ", round(is_eclip_hnrnpc, 2), ", MS: ", round(ms_eclip_hnrnpc, 4))
-message("EIF4G2 eCLIP - IS: ", round(is_eclip_eif4g2, 2), ", MS: ", round(ms_eclip_eif4g2, 4))
+message("HNRNPC eCLIP - IS: ", round(is_eclip_hnrnpc, 2), ", VS: ", round(vs_eclip_hnrnpc, 4))
+message("EIF4G2 eCLIP - IS: ", round(is_eclip_eif4g2, 2), ", VS: ", round(vs_eclip_eif4g2, 4))
 ```
 
 ## Visualization
@@ -303,9 +303,9 @@ message("EIF4G2 eCLIP - IS: ", round(is_eclip_eif4g2, 2), ", MS: ", round(ms_ecl
 plotIS(hnrnpc_enrichment)
 plotIS(eif4g2_enrichment)
 
-# MS Profile plots
-plotMS(hnrnpc_enrichment)
-plotMS(eif4g2_enrichment)
+# VS Profile plots
+plotVS(hnrnpc_enrichment)
+plotVS(eif4g2_enrichment)
 ```
 
 # Comparing Multiple RBPs
@@ -320,7 +320,7 @@ rbps <- colnames(rbns_data)[-1]  # Exclude 'Motif'
 results <- data.frame(
   RBP = rbps,
   IS = NA_real_,
-  MS = NA_real_
+  VS = NA_real_
 )
 
 for (i in seq_along(rbps)) {
@@ -329,7 +329,7 @@ for (i in seq_along(rbps)) {
     Score = rbns_data[[rbps[i]]]
   )
   results$IS[i] <- returnIS(temp_df)
-  results$MS[i] <- returnMS(temp_df, output_type = "number")
+  results$VS[i] <- returnVS(temp_df, output_type = "number")
 }
 
 print(results)
@@ -344,7 +344,7 @@ A key application is comparing **inherent specificity** (from RBNS) with
 comparison <- data.frame(
   Source = c("RBNS (Inherent)", "eCLIP (Apparent)"),
   IS = c(is_hnrnpc, is_eclip),
-  MS = c(ms_hnrnpc, ms_eclip)
+  VS = c(vs_hnrnpc, vs_eclip)
 )
 print(comparison)
 ```
@@ -354,3 +354,4 @@ print(comparison)
 ```{r session}
 sessionInfo()
 ```
+

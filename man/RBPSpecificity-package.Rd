@@ -4,7 +4,7 @@
 \name{RBPSpecificity-package}
 \alias{RBPSpecificity-package}
 \alias{RBPSpecificity}
-\title{RBPSpecificity: Analyze RBP Binding Specificity and Mutational Sensitivity}
+\title{RBPSpecificity: Analyze RBP Binding Specificity and Variation Sensitivity}
 \description{
 The `RBPSpecificity` package provides a suite of tools for researchers
 working with RNA Binding Proteins (RBPs) to analyze binding specificity from
@@ -12,7 +12,7 @@ high-throughput sequencing data such as CLIP (CrossLinking and
 ImmunoPrecipitation) and RBNS (RNA Bind-n-Seq).
 
 It allows users to quantify K-mer enrichment within RBP binding sites,
-assess the inherent specificity (IS) and the mutational sensitivity (MS) of
+assess the inherent specificity (IS) and the variation sensitivity (VS) of
 RBP towards the target motifs. The package aims to streamline bioinformatic
 analyses and provide clear visualizations for interpreting RBP specificity.
 
@@ -25,8 +25,8 @@ The main workflow of the package revolves around the following exported function
   \item \code{\link{motifEnrichment}}: Calculates K-mer enrichment from peak data...
   \item \code{\link{returnIS}}: Quantifies the inherent specificity (IS) of RBP...
   \item \code{\link{plotIS}}: Visualizes the distribution of motif enrichment scores with annotation...
-  \item \code{\link{returnMS}}: Quantifies the mutational sensitivity (MS) of RBP...
-  \item \code{\link{plotMS}}: Generates plots to visualize Mutational Sensitivity
+  \item \code{\link{returnVS}}: Quantifies the variation sensitivity (VS) of RBP...
+  \item \code{\link{plotVS}}: Generates plots to visualize Variation Sensitivity
 }
 }
 

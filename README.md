@@ -1,4 +1,4 @@
-<p align="center">
+﻿<p align="center">
   <img src="man/figures/logo.png" alt="RBPSpecificity" height="200" />
 </p>
 
@@ -8,7 +8,7 @@
 [![R Version](https://img.shields.io/badge/R-%3E%3D%204.3-blue)](https://cran.r-project.org/)
 <!-- badges: end -->
 
-**RBPSpecificity** provides tools to calculate Inherent Specificity (IS) and Mutational Sensitivity (MS) metrics for RNA-binding proteins from enrichment data.
+**RBPSpecificity** provides tools to calculate Inherent Specificity (IS) and Variation Sensitivity (VS) metrics for RNA-binding proteins from enrichment data.
 
 ## Installation
 
@@ -45,19 +45,19 @@ enrichment <- data.frame(
 # Calculate Inherent Specificity
 is_value <- returnIS(enrichment)
 
-# Calculate Mutational Sensitivity
-ms_value <- returnMS(enrichment, output_type = "number")
-ms_matrix <- returnMS(enrichment, output_type = "matrix")
+# Calculate Variation Sensitivity
+vs_value <- returnVS(enrichment, output_type = "number")
+vs_matrix <- returnVS(enrichment, output_type = "matrix")
 
 # Visualize
 plotIS(enrichment)
-plotMS(enrichment)
+plotVS(enrichment)
 ```
 
 ## Features
 
 - **Inherent Specificity (IS)** - Quantify binding specificity from enrichment distributions
-- **Mutational Sensitivity (MS)** - Measure sensitivity to single nucleotide changes
+- **Variation Sensitivity (VS)** - Measure sensitivity to single nucleotide changes
 - **De novo enrichment** - Calculate k-mer enrichment directly from CLIP peaks
 - **Visualization** - Distribution plots and sensitivity profiles
 
@@ -83,8 +83,8 @@ Calculate Inherent Specificity (IS).
 - **motif**: target motif (default: top scoring).
 - **return_type**: "specific" (default) or "all".
 
-### `returnMS`
-Calculate Mutational Sensitivity (MS).
+### `returnVS`
+Calculate Variation Sensitivity (VS).
 - **motif_enrichment**: result from `motifEnrichment`.
 - **motif**: reference motif (default: top scoring).
 - **return_type**: "specific" (default) or "all".
@@ -97,8 +97,8 @@ Visualize IS value on score distribution.
 - **motif**: target motif (default: top scoring).
 - **bins**: histogram bins (default: 50).
 
-### `plotMS`
-Visualize Mutational Sensitivity matrix.
+### `plotVS`
+Visualize Variation Sensitivity matrix.
 - **motif_enrichment**: result from `motifEnrichment`.
 - **motif**: reference motif (default: top scoring).
 
@@ -134,4 +134,5 @@ This package was developed in part with **Google Antigravity**.
 
 For the original R implementation of RBP specificity analysis, see **Deprecated** folder in:
 https://github.com/S00NYI/BITS_Specificity
+
 

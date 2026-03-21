@@ -1,12 +1,12 @@
-Package: RBPSpecificity
+﻿Package: RBPSpecificity
 Type: Package
-Title: RBP Inherent Specificity and Mutational Sensitivity Analysis Tool
+Title: RBP Inherent Specificity and Variation Sensitivity Analysis Tool
 Version: 0.99.0
 Description:
     Provides tools to analyze RNA Binding Protein (RBP) binding specificities
     from high-throughput sequencing data. Functions include calculating
     K-mer enrichment, Inherent Specificity (IS), and Mutational
-    Sensitivity (MS), along with visualization of IS and MS.
+    Sensitivity (VS), along with visualization of IS and VS.
     For detailed methodology and applications, please refer to our manuscript
     (see URL field or vignette).
 License: GPL-3
@@ -39,3 +39,4 @@ Suggests:
     rmarkdown,
     testthat
 VignetteBuilder: knitr
+

@@ -1,4 +1,4 @@
-# Plotting functions for visualization
+﻿# Plotting functions for visualization
 
 #' Plot Inherent Specificity (IS) Distribution
 #'
@@ -66,18 +66,18 @@ plotIS <- function(motif_enrichment, motif = NULL, bins = 50, ...) {
   return(plot)
 }
 
-#' Plot Mutational Sensitivity (MS) Matrix
+#' Plot Variation Sensitivity (VS) Matrix
 #'
-#' @description Visualizes the mutational sensitivity scores for a motif,
+#' @description Visualizes the variation sensitivity scores for a motif,
 #' typically showing sensitivity to SNVs at each position.
 #'
 #' @param motif_enrichment A data frame containing motif enrichment scores
 #'   (output from `motifEnrichment()`). Requires 'MOTIF' and 'Score' columns.
-#' @param motif Character string, the reference motif for which MS was calculated.
+#' @param motif Character string, the reference motif for which VS was calculated.
 #'   If NULL or "top", the top-scoring motif is used (default: NULL).
 #' @param ... Additional arguments passed to ggplot theme layers or geoms.
 #'
-#' @return A ggplot object visualizing the MS matrix (e.g., using points sized
+#' @return A ggplot object visualizing the VS matrix (e.g., using points sized
 #' or colored by sensitivity).
 #' @export
 #' @import ggplot2
@@ -89,25 +89,25 @@ plotIS <- function(motif_enrichment, motif = NULL, bins = 50, ...) {
 #' scores <- c(10,      5,      4,      3)
 #' df <- data.frame(MOTIF = motifs, Score = scores)
 #' 
-#' # Plot MS for "AAAA"
-#' plotMS(df, motif = "AAAA")
-plotMS <- function(motif_enrichment, motif = NULL, ...) {
-  # 1. Get the MS matrix by calling returnMS
-  ms_matrix <- returnMS(motif_enrichment, motif = motif, output_type = "matrix")
+#' # Plot VS for "AAAA"
+#' plotVS(df, motif = "AAAA")
+plotVS <- function(motif_enrichment, motif = NULL, ...) {
+  # 1. Get the VS matrix by calling returnVS
+  vs_matrix <- returnVS(motif_enrichment, motif = motif, output_type = "matrix")
 
-  if(all(is.na(ms_matrix))) {
-    warning("MS matrix contains all NAs, cannot generate plot.")
-    return(ggplot2::ggplot() + ggplot2::theme_void() + ggplot2::labs(title = "MS data not available"))
+  if(all(is.na(vs_matrix))) {
+    warning("VS matrix contains all NAs, cannot generate plot.")
+    return(ggplot2::ggplot() + ggplot2::theme_void() + ggplot2::labs(title = "VS data not available"))
   }
 
   # 2. Melt the matrix for ggplot
-  ms_df <- as.data.frame(ms_matrix)
-  ms_df$Nucleotide <- rownames(ms_df)
-  ms_long <- reshape2::melt(ms_df, id.vars = "Nucleotide", variable.name = "Position", value.name = "Sensitivity")
-  ms_long$Position <- as.numeric(gsub("Pos", "", ms_long$Position))
+  vs_df <- as.data.frame(vs_matrix)
+  vs_df$Nucleotide <- rownames(vs_df)
+  vs_long <- reshape2::melt(vs_df, id.vars = "Nucleotide", variable.name = "Position", value.name = "Sensitivity")
+  vs_long$Position <- as.numeric(gsub("Pos", "", vs_long$Position))
 
   # 3. Determine the subtitle text safely
-  ref_motif_name <- attr(ms_matrix, "motif_name")
+  ref_motif_name <- attr(vs_matrix, "motif_name")
   subtitle_text <- if (!is.null(ref_motif_name)) {
     paste("Reference Motif:", ref_motif_name)
   } else {
@@ -116,16 +116,16 @@ plotMS <- function(motif_enrichment, motif = NULL, ...) {
   }
 
   # 4. Create the plot
-  plot <- ggplot2::ggplot(ms_long, ggplot2::aes(x = Position, y = Sensitivity, fill = Nucleotide)) +
+  plot <- ggplot2::ggplot(vs_long, ggplot2::aes(x = Position, y = Sensitivity, fill = Nucleotide)) +
     ggplot2::geom_point(shape = 21, size = 8, stroke = 1, na.rm = TRUE) +
     ggplot2::scale_fill_manual(values = c("G" = "#F5C714", "A" = "#70BF52", "C" = "#3D94D1", "U" = "#E0546C", "T" = "#E0546C")) +
-    ggplot2::scale_x_continuous(breaks = seq_len(ncol(ms_matrix))) +
+    ggplot2::scale_x_continuous(breaks = seq_len(ncol(vs_matrix))) +
     ggplot2::scale_y_continuous(limits = c(1.05, -0.05), breaks = seq(0, 1, by = 0.2), trans = 'reverse') +
     ggplot2::labs(
-      title = "Mutational Sensitivity Profile",
+      title = "Variation Sensitivity Profile",
       subtitle = subtitle_text,
       x = "Position in Motif",
-      y = "Mutational Sensitivity (1 - Variant Score)"
+      y = "Variation Sensitivity (1 - Variant Score)"
     ) +
     ggplot2::theme_bw() +
     ggplot2::theme(axis.text = ggplot2::element_text(size=14),
@@ -136,3 +136,4 @@ plotMS <- function(motif_enrichment, motif = NULL, ...) {
 }
 
 #-------------------------------------------------------------------------------
+

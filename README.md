@@ -1,4 +1,4 @@
-﻿<p align="center">
+<p align="center">
   <img src="man/figures/logo.png" alt="RBPSpecificity" height="200" />
 </p>
 
@@ -15,11 +15,11 @@
 ### From GitHub (Development)
 
 ```r
-# Install devtools if needed
-if (!requireNamespace("devtools", quietly = TRUE))
-    install.packages("devtools")
+# Install pak if needed
+if (!requireNamespace("pak", quietly = TRUE))
+    install.packages("pak")
 
-devtools::install_github("S00NYI/RBPSpecificity")
+pak::pkg_install("S00NYI/RBPSpecificity")
 ```
 
 <!-- ### From Bioconductor (After Acceptance)

@@ -1,4 +1,4 @@
-﻿# Test Variation Sensitivity (VS) Functions
+# Test Variation Sensitivity (VS) Functions
 # Tests for returnVS()
 
 test_that("returnVS returns numeric value with output_type='number'", {

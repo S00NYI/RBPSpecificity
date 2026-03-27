@@ -1,5 +1,5 @@
 # Test Visualization Functions
-# Tests for plotIS() and plotMS()
+# Tests for plotIS() and plotVS()
 
 test_that("plotIS returns a ggplot object", {
   df <- data.frame(
@@ -40,36 +40,36 @@ test_that("plotIS errors on invalid input", {
   expect_error(plotIS(df_bad))
 })
 
-test_that("plotMS returns a ggplot object", {
+test_that("plotVS returns a ggplot object", {
   df <- data.frame(
     MOTIF = c("AAAA", "CAAA", "GAAA", "UAAA", "ACAA", "AGAA", "AUAA"),
     Score = c(10, 5, 4, 3, 6, 5, 4)
   )
   
-  result <- plotMS(df)
+  result <- plotVS(df)
   
   expect_s3_class(result, "ggplot")
 })
 
-test_that("plotMS works with specific motif", {
+test_that("plotVS works with specific motif", {
   df <- data.frame(
     MOTIF = c("CCCC", "ACCC", "GCCC", "UCCC", "CACC", "CGCC", "CUCC"),
     Score = c(10, 8, 7, 6, 5, 4, 3)
   )
   
-  result <- plotMS(df, motif = "CCCC")
+  result <- plotVS(df, motif = "CCCC")
   
   expect_s3_class(result, "ggplot")
 })
 
-test_that("plotMS handles incomplete variant data", {
+test_that("plotVS handles incomplete variant data", {
   # Motif with missing variants
   df <- data.frame(
     MOTIF = c("AAAA", "CAAA"),  # Missing GAAA, UAAA, etc.
     Score = c(10, 5)
   )
   
-  result <- plotMS(df)
+  result <- plotVS(df)
   
   expect_s3_class(result, "ggplot")
 })

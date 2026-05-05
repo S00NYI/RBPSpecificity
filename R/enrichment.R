@@ -273,7 +273,7 @@ calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
 #' @param coordinates A data frame or GRanges object containing genomic coordinates.
 #'   If a data frame, it must contain columns for chromosome, start, and end.
 #' @param species_or_build Character string identifying the genome build (e.g.,
-#'   "hg38", "mm10"). This is used to load the appropriate BSgenome package.
+#'   "hg38", "mm10", "mm39"). This is used to load the appropriate BSgenome package.
 #' @param K Integer, the length of the K-mers to analyze (e.g., 5).
 #' @param extension A numeric vector of length 2: `c(five_prime, three_prime)`.
 #'   Positive values extend, negative values trim. Extension/trimming is strand-aware.

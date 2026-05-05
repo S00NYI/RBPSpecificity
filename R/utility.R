@@ -306,8 +306,8 @@ valInputMotif <- function(motif, kmer_size, available_motifs) {
 #' @description Loads the appropriate BSgenome package based on a species or
 #' build identifier. Checks if the package is installed.
 #'
-#' @param species_or_build Character string (e.g., "hg38", "human", "mm10", "mouse").
-#'   Currently supports hg19, hg38, mm9, mm10.
+#' @param species_or_build Character string (e.g., "hg38", "mm10", "mm39").
+#'   Currently supports hg19, hg38, mm9, mm10, mm39.
 #'
 #' @return A BSgenome object.
 #' @importFrom BSgenome getBSgenome
@@ -325,9 +325,10 @@ selectGenome <- function(species_or_build) {
     "hg38" = "BSgenome.Hsapiens.UCSC.hg38",
     "grch38" = "BSgenome.Hsapiens.UCSC.hg38",
     "mm9" = "BSgenome.Mmusculus.UCSC.mm9",
-    "mouse" = "BSgenome.Mmusculus.UCSC.mm10", # Default mouse to mm10
     "mm10" = "BSgenome.Mmusculus.UCSC.mm10",
-    "grcm38" = "BSgenome.Mmusculus.UCSC.mm10"
+    "grcm38" = "BSgenome.Mmusculus.UCSC.mm10",
+    "mm39" = "BSgenome.Mmusculus.UCSC.mm39",
+    "grcm39" = "BSgenome.Mmusculus.UCSC.mm39"
     # Add more mappings here if needed
   )
 

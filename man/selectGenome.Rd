@@ -7,8 +7,8 @@
 selectGenome(species_or_build)
 }
 \arguments{
-\item{species_or_build}{Character string (e.g., "hg38", "human", "mm10", "mouse").
-Currently supports hg19, hg38, mm9, mm10.}
+\item{species_or_build}{Character string (e.g., "hg38", "mm10", "mm39").
+Currently supports hg19, hg38, mm9, mm10, mm39.}
 }
 \value{
 A BSgenome object.

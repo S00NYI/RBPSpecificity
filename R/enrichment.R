@@ -41,7 +41,7 @@
 countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
                           bkg_min_dist = 500, bkg_iter = 100, bkg_max_dist = 1000,
                           internal_min_length_for_bkg_seqs = K, scramble_bkg = TRUE,
-                          chunk_size = NULL) {
+                          chunk_size = NULL, extension = c(0L, 0L)) {
   # --- Input Validation ---
   if (!methods::is(original_peak_gr, "GRanges") || length(original_peak_gr) == 0) {
     stop("'original_peak_gr' must be a non-empty GRanges object.")
@@ -113,7 +113,8 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
       bkg_min_dist = bkg_min_dist,
       bkg_max_dist = bkg_max_dist,
       scramble = scramble_bkg,
-      n_iter = n_this_chunk
+      n_iter = n_this_chunk,
+      extension = extension
     )
 
     if (length(bkg_result$sequences) > 0) {
@@ -407,7 +408,8 @@ motifEnrichment <- function(coordinates,
       bkg_min_dist = bkg_min_dist,
       bkg_iter = bkg_iter,
       bkg_max_dist = bkg_max_dist,
-      scramble_bkg = scramble_bkg
+      scramble_bkg = scramble_bkg,
+      extension = extension
     )
     if (scramble_bkg) {
       message("Generated average background K-mer profile using local shifting with scrambling.")

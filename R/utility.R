@@ -889,7 +889,7 @@ generateBkgSet <- function(peak_gr, genome_obj, K,
 #' @keywords internal
 generateBkgSetBatched <- function(peak_gr, genome_obj, min_seq_length,
                                    bkg_min_dist, bkg_max_dist,
-                                   scramble, n_iter) {
+                                   scramble, n_iter, extension = c(0L, 0L)) {
   empty_result <- list(sequences = Biostrings::DNAStringSet(), iter_tags = integer(0))
   num_peaks <- length(peak_gr)
   total_regions <- num_peaks * n_iter
@@ -934,6 +934,32 @@ generateBkgSetBatched <- function(peak_gr, genome_obj, min_seq_length,
   common_sl <- intersect(names(genome_sl), GenomeInfoDb::seqlevels(shifted_gr))
   if (length(common_sl) > 0) {
     GenomeInfoDb::seqlengths(shifted_gr)[common_sl] <- genome_sl[common_sl]
+  }
+
+  # Apply strand-aware extension to match peak sequence length
+  if (any(extension != 0L)) {
+    ext_5prime <- extension[1]
+    ext_3prime <- extension[2]
+    strand_info <- as.character(GenomicRanges::strand(shifted_gr))
+    plus_idx <- strand_info %in% c("+", "*")
+    minus_idx <- strand_info == "-"
+    new_start <- GenomicRanges::start(shifted_gr)
+    new_end   <- GenomicRanges::end(shifted_gr)
+    new_start[plus_idx]  <- new_start[plus_idx]  - ext_5prime
+    new_end[plus_idx]    <- new_end[plus_idx]    + ext_3prime
+    new_end[minus_idx]   <- new_end[minus_idx]   + ext_5prime
+    new_start[minus_idx] <- new_start[minus_idx] - ext_3prime
+    final_widths <- new_end - new_start + 1L
+    valid_ext <- final_widths >= min_seq_length
+    if (any(!valid_ext)) {
+      shifted_gr <- shifted_gr[valid_ext]
+      iter_tags  <- iter_tags[valid_ext]
+      new_start  <- new_start[valid_ext]
+      new_end    <- new_end[valid_ext]
+    }
+    if (length(shifted_gr) == 0) return(empty_result)
+    GenomicRanges::start(shifted_gr) <- new_start
+    GenomicRanges::end(shifted_gr)   <- new_end
   }
 
   # 5. Trim to chromosome boundaries and filter by min length

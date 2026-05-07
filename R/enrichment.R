@@ -26,11 +26,17 @@
 #' @param scramble_bkg Logical, if TRUE (default), scrambles background sequences.
 #'   Set to FALSE for faster execution when scrambling is not needed.
 #'
-#' @return A data frame with two columns: 'MOTIF' (all possible K-mers for the
-#'   specified type and K, in uppercase) and 'AVG_BKG_COUNT' (the average count
-#'   of each K-mer across all background iterations, rounded).
-#'   Returns a data frame with 0 counts if no valid background sequences
-#'   could be generated across all iterations.
+#' @return A list with four elements:
+#'   \describe{
+#'     \item{MOTIF}{Character vector of all possible K-mers.}
+#'     \item{bkg_total_count}{Integer vector, total occurrences of
+#'       each K-mer pooled across all background iterations (ANR).}
+#'     \item{bkg_presence_count}{Integer vector, number of background
+#'       sequences containing each K-mer at least once, pooled
+#'       across all iterations (ZOOPS).}
+#'     \item{bkg_total_seqs}{Integer, total number of background
+#'       sequences generated across all iterations.}
+#'   }
 #'
 #' @importFrom Biostrings DNAStringSet
 #' @importFrom S4Vectors elementNROWS
@@ -85,12 +91,18 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
     stop("Could not generate the K-mer universe template. Check K and type parameters for countKmers.")
   }
 
-  # --- Accumulator matrix ---
+  # --- Accumulator matrices ---
   counts_accumulator_matrix <- matrix(0L,
-    nrow = length(all_kmers_vector),
-    ncol = bkg_iter,
-    dimnames = list(all_kmers_vector, NULL)
+      nrow = length(all_kmers_vector),
+      ncol = bkg_iter,
+      dimnames = list(all_kmers_vector, NULL)
   )
+  presence_accumulator_matrix <- matrix(0L,
+      nrow = length(all_kmers_vector),
+      ncol = bkg_iter,
+      dimnames = list(all_kmers_vector, NULL)
+  )
+  total_bkg_seqs <- 0L
 
   valid_iterations_count <- 0
 
@@ -119,21 +131,47 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
 
     if (length(bkg_result$sequences) > 0) {
       # One oligonucleotideFrequency call for entire chunk
-      freq_matrix <- Biostrings::oligonucleotideFrequency(bkg_result$sequences, width = K)
+      freq_matrix <- Biostrings::oligonucleotideFrequency(
+          bkg_result$sequences, width = K
+      )
 
-      # Grouped sums via rowsum (C-level, very fast)
-      per_iter_sums <- rowsum(freq_matrix, group = bkg_result$iter_tags, reorder = TRUE)
+      # ANR: total counts per iteration
+      per_iter_sums <- rowsum(
+          freq_matrix,
+          group = bkg_result$iter_tags,
+          reorder = TRUE
+      )
 
-      # Map chunk-local iteration indices to global column indices
-      iter_indices_in_chunk <- as.integer(rownames(per_iter_sums))
+      # ZOOPS: binary presence per iteration
+      presence_matrix <- (freq_matrix > 0L) * 1L
+      per_iter_presence <- rowsum(
+          presence_matrix,
+          group = bkg_result$iter_tags,
+          reorder = TRUE
+      )
+
+      # Map chunk-local iteration indices to global columns
+      iter_indices_in_chunk <- as.integer(
+          rownames(per_iter_sums)
+      )
       global_col_indices <- cs + iter_indices_in_chunk - 1L
 
-      # Store in accumulator (columns of freq_matrix match all_kmers_vector order)
-      counts_accumulator_matrix[, global_col_indices] <- t(per_iter_sums)
+      # Store in accumulators
+      counts_accumulator_matrix[
+          , global_col_indices
+      ] <- t(per_iter_sums)
+      presence_accumulator_matrix[
+          , global_col_indices
+      ] <- t(per_iter_presence)
 
-      # Count valid iterations (those with non-zero total counts)
+      # Track total background sequences
+      total_bkg_seqs <- total_bkg_seqs +
+          length(bkg_result$sequences)
+
+      # Count valid iterations
       iter_totals <- rowSums(per_iter_sums)
-      valid_iterations_count <- valid_iterations_count + sum(iter_totals > 0)
+      valid_iterations_count <- valid_iterations_count +
+          sum(iter_totals > 0)
     }
 
     utils::setTxtProgressBar(pb, chunk_end)
@@ -153,335 +191,273 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
     )
   }
 
-  average_counts <- rowMeans(counts_accumulator_matrix, na.rm = FALSE)
-
-  results_df <- data.frame(
-    MOTIF = all_kmers_vector,
-    AVG_BKG_COUNT = round(average_counts, 4),
-    stringsAsFactors = FALSE
+  list(
+      MOTIF = all_kmers_vector,
+      bkg_total_count = as.integer(
+          rowSums(counts_accumulator_matrix)
+      ),
+      bkg_presence_count = as.integer(
+          rowSums(presence_accumulator_matrix)
+      ),
+      bkg_total_seqs = total_bkg_seqs
   )
-
-  return(results_df)
 }
 
 
 #' Calculate Background-Corrected K-mer Enrichment
 #'
-#' @description Calculates enrichment scores by comparing K-mer counts from
-#'   actual peaks against averaged background K-mer counts using a specified method.
+#' @description Computes enrichment scores comparing peak K-mer
+#'   counts against background using either ZOOPS (per-sequence
+#'   presence) or ANR (total occurrence) models.
 #'
-#' @param peak_kmer_counts_df A data frame with 'MOTIF' and 'COUNT' columns,
-#'   representing K-mer counts from the primary (e.g., peak) sequences. Typically
-#'   the output of `countKmers()`.
-#' @param avg_bkg_counts_df A data frame with 'MOTIF' and 'AVG_BKG_COUNT' columns,
-#'   representing averaged K-mer counts from background regions. Typically the
-#'   output of `countKmersBkg()`.
-#' @param method Character string (case-insensitive) specifying the enrichment
-#'   calculation method. Supported: "subtract" (default), "fold_change",
-#'   "log2_fold_change".
-#' @param pseudocount Numeric, a small value added to both peak and background
-#'   counts when using "fold_change" or "log2_fold_change" methods to avoid
-#'   division by zero or log of zero. Default: 1.
+#' @param peak_counts_df Data frame from \code{countKmers()}, with
+#'   columns MOTIF, COUNT, SEQ_WITH_MOTIF, SEQ_TOTAL.
+#' @param bkg_data List from \code{countKmersBkg()}, with elements
+#'   MOTIF, bkg_total_count, bkg_presence_count, bkg_total_seqs.
+#' @param method Character, "zoops" or "anr". Default: "zoops".
+#' @param pseudocount Numeric, added to fractions/rates before
+#'   log2 to avoid log(0). Default: 1e-4.
 #'
-#' @return A data frame with 'MOTIF' and 'EnrichmentScore' columns.
+#' @return A data frame with 10 columns: MOTIF, Score, log2FC,
+#'   pvalue, padj, target_fraction, bkg_fraction,
+#'   target_occurence, bkg_occurence, multiplicity. Score is
+#'   min-max normalized enrichment difference (fraction
+#'   difference for ZOOPS, rate difference for ANR).
 #'
-#' @importFrom dplyr full_join select mutate arrange desc %>%
-#' @keywords internal # Helper for the main motifEnrichment function
-calEnrichment <- function(peak_kmer_counts_df, avg_bkg_counts_df,
-                          method = "subtract", pseudocount = 1) {
-  # Input Validation
-  if (!is.data.frame(peak_kmer_counts_df) || !all(c("MOTIF", "COUNT") %in% colnames(peak_kmer_counts_df))) {
-    stop("'peak_kmer_counts_df' must be a data frame with 'MOTIF' and 'COUNT' columns.")
-  }
-  if (!is.data.frame(avg_bkg_counts_df) || !all(c("MOTIF", "AVG_BKG_COUNT") %in% colnames(avg_bkg_counts_df))) {
-    stop("'avg_bkg_counts_df' must be a data frame with 'MOTIF' and 'AVG_BKG_COUNT' columns.")
-  }
-  if (!is.character(method) || length(method) != 1) {
-    stop("'method' must be a single character string.")
-  }
-  if (!is.numeric(pseudocount) || length(pseudocount) != 1 || pseudocount < 0) {
-    stop("'pseudocount' must be a single non-negative number.")
-  }
+#' @importFrom stats phyper pbinom p.adjust
+#' @keywords internal
+calEnrichment <- function(peak_counts_df, bkg_data,
+                          method = "zoops",
+                          pseudocount = 1e-4) {
+    method <- match.arg(tolower(method), c("zoops", "anr"))
 
-  method_upper <- toupper(method)
+    n_peak <- peak_counts_df$SEQ_TOTAL[1]
+    n_bkg <- bkg_data$bkg_total_seqs
 
-  # Merge peak and background counts. Use inner_join to ensure only motifs present in both are kept,
-  # or left_join from peaks if we want to keep all peak motifs and assign NA/0 to missing bkg.
-  # For enrichment, usually, we're interested in motifs found in peaks.
-  # countKmers and countKmersBkg should produce all possible K-mers, so MOTIF column should be exhaustive.
-  # An inner_join is safest if there's any doubt about motif list completeness.
-  # A full_join then handling NAs might be more robust if one df could miss motifs.
-  # Let's assume both DFs have the complete set of motifs generated by countKmers.
+    # ZOOPS fractions (always computed)
+    target_fraction <- peak_counts_df$SEQ_WITH_MOTIF / n_peak
+    bkg_fraction <- bkg_data$bkg_presence_count / n_bkg
 
-  # For robustness, ensure MOTIF columns are character
-  peak_kmer_counts_df$MOTIF <- as.character(peak_kmer_counts_df$MOTIF)
-  avg_bkg_counts_df$MOTIF <- as.character(avg_bkg_counts_df$MOTIF)
+    # ANR rates (always computed)
+    target_rate <- peak_counts_df$COUNT / n_peak
+    bkg_rate <- bkg_data$bkg_total_count / n_bkg
 
-  # A full join is better to handle cases where one set might be missing motifs (shouldn't happen ideally)
-  # or if the order is not guaranteed identical (though it should be from countKmers).
-  # Replace NAs that might arise from join with 0 for counts.
-  merged_counts <- dplyr::full_join(peak_kmer_counts_df, avg_bkg_counts_df, by = "MOTIF")
-  merged_counts$COUNT[is.na(merged_counts$COUNT)] <- 0
-  merged_counts$AVG_BKG_COUNT[is.na(merged_counts$AVG_BKG_COUNT)] <- 0
-
-
-  enriched_df <- switch(method_upper,
-    "SUBTRACT" = {
-      merged_counts %>%
-        dplyr::mutate(EnrichmentScore = COUNT - AVG_BKG_COUNT) %>%
-        dplyr::select(MOTIF, EnrichmentScore)
-    },
-    "FOLD_CHANGE" = {
-      merged_counts %>%
-        dplyr::mutate(EnrichmentScore = (COUNT + pseudocount) / (AVG_BKG_COUNT + pseudocount)) %>%
-        dplyr::select(MOTIF, EnrichmentScore)
-    },
-    "LOG2_FOLD_CHANGE" = {
-      merged_counts %>%
-        dplyr::mutate(EnrichmentScore = log2((COUNT + pseudocount) / (AVG_BKG_COUNT + pseudocount))) %>%
-        dplyr::select(MOTIF, EnrichmentScore)
-    },
-    stop(
-      "Unsupported enrichment 'method': ", method,
-      ". Supported methods are 'subtract', 'fold_change', 'log2_fold_change'."
+    # Multiplicity: avg occurrences per containing sequence
+    multiplicity <- ifelse(
+        peak_counts_df$SEQ_WITH_MOTIF > 0L,
+        peak_counts_df$COUNT / peak_counts_df$SEQ_WITH_MOTIF,
+        0
     )
-  )
 
-  # Optionally, arrange by score
-  # enriched_df <- enriched_df %>% dplyr::arrange(dplyr::desc(EnrichmentScore))
+    if (method == "zoops") {
+        log2FC <- log2(
+            (target_fraction + pseudocount) /
+            (bkg_fraction + pseudocount)
+        )
+        pvalue <- stats::phyper(
+            q = peak_counts_df$SEQ_WITH_MOTIF - 1L,
+            m = peak_counts_df$SEQ_WITH_MOTIF +
+                bkg_data$bkg_presence_count,
+            n = (n_peak - peak_counts_df$SEQ_WITH_MOTIF) +
+                (n_bkg - bkg_data$bkg_presence_count),
+            k = n_peak,
+            lower.tail = FALSE
+        )
+        score_raw <- target_fraction - bkg_fraction
+    } else {
+        log2FC <- log2(
+            (target_rate + pseudocount) /
+            (bkg_rate + pseudocount)
+        )
+        p_null <- n_peak / (n_peak + n_bkg)
+        pvalue <- stats::pbinom(
+            q = peak_counts_df$COUNT - 1L,
+            size = peak_counts_df$COUNT +
+                bkg_data$bkg_total_count,
+            prob = p_null,
+            lower.tail = FALSE
+        )
+        score_raw <- target_rate - bkg_rate
+    }
 
-  return(enriched_df)
+    padj <- stats::p.adjust(pvalue, method = "BH")
+    Score <- minmaxNorm(score_raw)
+
+    data.frame(
+        MOTIF = peak_counts_df$MOTIF,
+        Score = Score,
+        log2FC = log2FC,
+        pvalue = pvalue,
+        padj = padj,
+        target_fraction = target_fraction,
+        bkg_fraction = bkg_fraction,
+        target_occurence = as.integer(peak_counts_df$COUNT),
+        bkg_occurence = bkg_rate,
+        multiplicity = round(multiplicity, 4),
+        stringsAsFactors = FALSE
+    )
 }
 
 #' Calculate K-mer Motif Enrichment from Genomic Coordinates
 #'
 #' @description
-#' This is the main workflow function for the RBPSpecificity package. It processes
-#' RBP binding peak data (e.g., from eCLIP experiments) to calculate normalized,
-#' background-corrected enrichment scores for all K-mers of a given length.
+#' Main workflow function for RBPSpecificity. Processes RBP
+#' binding peak data to calculate background-corrected K-mer
+#' enrichment scores using either ZOOPS (per-sequence presence)
+#' or ANR (total occurrence) statistical models.
 #'
 #' @details
 #' The workflow proceeds as follows:
-#' 1.  Parses input coordinate data into a standardized GRanges object.
-#' 2.  Loads the specified BSgenome object for sequence retrieval.
-#' 3.  Extracts sequences for peak regions, applying optional extension/trimming.
-#' 4.  Counts K-mers within the peak sequences.
-#' 5.  Generates an averaged K-mer profile from multiple background sets. Background
-#'     sets are created by shifting and scrambling genomic regions.
-#' 6.  Calculates enrichment scores by comparing peak counts to background counts.
-#' 7.  Normalizes the final enrichment scores to a standard scale.
+#' 1. Parses input coordinates into a GRanges object.
+#' 2. Loads the specified BSgenome for sequence retrieval.
+#' 3. Extracts peak sequences with optional extension/trimming.
+#' 4. Counts K-mers (both total and per-sequence presence).
+#' 5. Generates background K-mer profiles from shifted regions.
+#' 6. Computes enrichment with statistical testing.
 #'
-#' @param coordinates A data frame or GRanges object containing genomic coordinates.
-#'   If a data frame, it must contain columns for chromosome, start, and end.
-#' @param species_or_build Character string identifying the genome build (e.g.,
-#'   "hg38", "mm10", "mm39"). This is used to load the appropriate BSgenome package.
-#' @param K Integer, the length of the K-mers to analyze (e.g., 5).
-#' @param extension A numeric vector of length 2: `c(five_prime, three_prime)`.
-#'   Positive values extend, negative values trim. Extension/trimming is strand-aware.
-#'   Default: `c(0, 0)` (no change).
-#' @param enrichment_method Character string, the method for calculating enrichment.
-#'   Supported: "subtract" (default), "fold_change", "log2_fold_change".
-#' @param normalization_method Character string, the method for normalizing the final
-#'   enrichment scores. Supported: "min_max" (default), "z_score", "log2", "none".
-#' @param log_transform Logical, if TRUE, applies a log transformation after scaling,
-#'   mimicking the original analysis script's method (min-max to [1,e] then log).
-#'   If FALSE, performs only the specified `normalization_method`. Default: TRUE.
-#' @param bkg_iter Integer, the number of background iterations to perform for averaging.
-#'   Default: 100.
-#' @param bkg_min_dist Integer, the minimum distance (in base pairs) to shift peaks when
-#'   creating background regions. Default: 500.
-#' @param bkg_max_dist Integer, the maximum distance for shifting peaks. Default: 1000.
-#' @param scramble_bkg Logical, if TRUE (default), scrambles background sequences after
-#'   shifting. Set to FALSE for faster execution when using local background only.
-#' @param nucleic_acid_type Character string, "DNA" or "RNA". Determines the alphabet
-#'   for K-mer generation. Default: "DNA".
-#' @param background_type Character string, "local" (default) or "global".
-#'   - "local": Generates background by shifting (and optionally scrambling) peak regions.
-#'   - "global": Uses pre-calculated motif counts from specific genomic regions
-#'     stored in the package (supporting K=4, 5, 6, 7).
-#'   If `global_background_region` is explicitly provided, this defaults to "global".
-#' @param global_background_region Character string, the region to use for global
-#'   background. Supported: "WholeGenome" (default), "5UTR", "CDS", "3UTR", "introns", "exons".
-#'   Providing this argument will automatically switch `background_type` to "global"
-#'   unless otherwise specified.
-#' @param ... Additional arguments passed to `normalizeScores()` (e.g., `a=0, b=1`
-#'   for min-max normalization).
+#' @param coordinates A data frame or GRanges object with genomic
+#'   coordinates. Data frames need chr, start, end columns.
+#' @param species_or_build Character, genome build (e.g. "hg38").
+#' @param K Integer, K-mer length (e.g. 5).
+#' @param extension Numeric vector of length 2:
+#'   c(five_prime, three_prime). Positive extends, negative trims.
+#'   Default: c(0, 0).
+#' @param method Character, enrichment model: "zoops" (default)
+#'   for per-sequence presence or "anr" for total occurrences.
+#' @param bkg_iter Integer, background iterations. Default: 100.
+#' @param bkg_min_dist Integer, min shift distance. Default: 500.
+#' @param bkg_max_dist Integer, max shift distance. Default: 1000.
+#' @param scramble_bkg Logical, scramble background sequences.
+#'   Default: TRUE.
+#' @param nucleic_acid_type Character, "DNA" or "RNA".
+#'   Default: "DNA".
 #'
-#' @return A data frame containing two columns: 'MOTIF' (all possible K-mers) and
-#'   'Score' (the final, normalized enrichment score).
+#' @return A data frame with 10 columns:
+#'   \describe{
+#'     \item{MOTIF}{K-mer sequence.}
+#'     \item{Score}{Min-max normalized log2FC, range [0, 1].}
+#'     \item{log2FC}{Log2 fold-change (method-specific).}
+#'     \item{pvalue}{Statistical significance (method-specific).}
+#'     \item{padj}{Benjamini-Hochberg adjusted p-value.}
+#'     \item{target_fraction}{Fraction of peak sequences
+#'       containing the motif (ZOOPS).}
+#'     \item{bkg_fraction}{Fraction of background sequences
+#'       containing the motif (ZOOPS).}
+#'     \item{target_occurence}{Total motif occurrences in peaks.}
+#'     \item{bkg_occurence}{Background occurrence rate
+#'       (per sequence).}
+#'     \item{multiplicity}{Average occurrences per containing
+#'       sequence.}
+#'   }
 #' @export
 #'
 #' @examples
-#' \dontrun{
-#' # Option 1: Using Local Background (default, with scrambling)
-#' res_local <- motifEnrichment(my_coords, "hg38", K = 5)
-#'
-#' # Option 2: Using Local Background without scrambling (faster)
-#' res_local_fast <- motifEnrichment(my_coords, "hg38", K = 5, scramble_bkg = FALSE)
-#'
-#' # Option 3: Using Global Background (automatically switched by providing region)
-#' res_global <- motifEnrichment(my_coords, "hg38", K = 5, global_background_region = "5UTR")
-#'
-#' # Option 4: Explicit Global Background
-#' res_global_explicit <- motifEnrichment(
-#'   coordinates = my_coords,
-#'   species_or_build = "hg38",
-#'   K = 5,
-#'   background_type = "global"
-#' )
+#' \donttest{
+#' peaks_file <- system.file("extdata",
+#'     "eCLIP_Peaks_HNRNPC.bed",
+#'     package = "RBPSpecificity")
+#' peaks <- read.table(peaks_file,
+#'     header = FALSE, sep = "\t")
+#' colnames(peaks) <- c("chr", "start", "end",
+#'     "name", "score", "strand")
+#' result <- motifEnrichment(peaks, "hg38", K = 5,
+#'     method = "zoops", bkg_iter = 5)
+#' head(result)
 #' }
 motifEnrichment <- function(coordinates,
                             species_or_build,
                             K,
                             extension = c(0, 0),
-                            enrichment_method = "subtract",
-                            normalization_method = "min_max",
-                            log_transform = TRUE,
+                            method = "zoops",
                             bkg_iter = 100,
                             bkg_min_dist = 500,
                             bkg_max_dist = 1000,
                             scramble_bkg = TRUE,
-                            nucleic_acid_type = "DNA",
-                            background_type = "local",
-                            global_background_region = "WholeGenome",
-                            ...) {
-  # --- 1. Input Validation and Logic Setup ---
-  # If the user provided a global region but didn't specify background_type,
-  # assume they want global background.
-  if (!missing(global_background_region) && missing(background_type)) {
-    background_type <- "global"
-  }
+                            nucleic_acid_type = "DNA") {
+    # --- 1. Input Validation ---
+    message("--- Phase 1: Validating Inputs ---")
+    if (missing(coordinates) ||
+        missing(species_or_build) ||
+        missing(K)) {
+        stop("'coordinates', 'species_or_build', ",
+             "and 'K' are required.")
+    }
+    method <- match.arg(
+        tolower(method), c("zoops", "anr")
+    )
+    if (!is.numeric(extension) || length(extension) != 2) {
+        stop("'extension' must be a numeric vector ",
+             "of length 2: c(five_prime, three_prime).")
+    }
+    extension <- as.integer(extension)
 
-  message("--- Phase 1: Initializing and Validating Inputs ---")
-  if (missing(coordinates) || missing(species_or_build) || missing(K)) {
-    stop("Arguments 'coordinates', 'species_or_build', and 'K' are required.")
-  }
+    # Load genome
+    genome_obj <- selectGenome(species_or_build)
+    message("Loaded genome: ", species_or_build)
 
-  # Validate extension parameter
-  if (!is.numeric(extension) || length(extension) != 2) {
-    stop("'extension' must be a numeric vector of length 2: c(five_prime, three_prime).")
-  }
-  extension <- as.integer(extension)
+    # Parse coordinates
+    peak_gr <- peakParse(input = coordinates)
+    if (length(peak_gr) == 0) {
+        stop("No coordinates after parsing.")
+    }
+    message("Parsed ", length(peak_gr), " coordinates.")
 
-  # Load genome object
-  genome_obj <- selectGenome(species_or_build)
-  message("Successfully loaded genome: ", species_or_build)
+    # --- 2. Peak Sequence Processing ---
+    message("\n--- Phase 2: Processing Peak Sequences ---")
+    peak_sequences <- getSequence(
+        granges_obj = peak_gr,
+        genome_obj = genome_obj,
+        extension = extension,
+        min_length = K
+    )
+    if (length(peak_sequences) == 0) {
+        stop("No sequences retrieved. ",
+             "Check coordinates and chromosome names.")
+    }
+    message("Retrieved ", length(peak_sequences),
+            " sequences.")
 
-  # Parse coordinate data into GRanges
-  peak_gr <- peakParse(input = coordinates)
-  if (length(peak_gr) == 0) {
-    stop("Coordinate data is empty after parsing and filtering. Cannot proceed.")
-  }
-  message("Successfully parsed ", length(peak_gr), " coordinates.")
+    peak_kmer_counts <- countKmers(
+        sequences = peak_sequences,
+        K = K,
+        type = nucleic_acid_type
+    )
+    message("Counted K-mers. ",
+            sum(peak_kmer_counts$COUNT > 0),
+            " non-zero K-mers.")
 
-  # --- 2. Peak Sequence Processing ---
-  message("\n--- Phase 2: Processing Peak Sequences ---")
-  peak_sequences <- getSequence(
-    granges_obj = peak_gr,
-    genome_obj = genome_obj,
-    extension = extension,
-    min_length = K
-  )
-  if (length(peak_sequences) == 0) {
-    stop("No sequences retrieved from coordinates. Check coordinates and chromosome names.")
-  }
-  message("Retrieved ", length(peak_sequences), " sequences from coordinate regions.")
-
-  # Count K-mers in peaks
-  peak_kmer_counts <- countKmers(
-    sequences = peak_sequences,
-    K = K,
-    type = nucleic_acid_type
-  )
-  message("Counted K-mers in peak sequences. Found ", sum(peak_kmer_counts$COUNT > 0), " non-zero K-mers.")
-
-  # --- 3. Background Calculation ---
-  message("\n--- Phase 3: Generating Background Profile ---")
-  background_type_lower <- tolower(background_type)
-
-  if (background_type_lower == "local") {
+    # --- 3. Background Generation ---
+    message("\n--- Phase 3: Generating Background ---")
     bkg_kmer_counts <- countKmersBkg(
-      original_peak_gr = peak_gr,
-      K = K,
-      type = nucleic_acid_type,
-      genome_obj = genome_obj,
-      bkg_min_dist = bkg_min_dist,
-      bkg_iter = bkg_iter,
-      bkg_max_dist = bkg_max_dist,
-      scramble_bkg = scramble_bkg,
-      extension = extension
+        original_peak_gr = peak_gr,
+        K = K,
+        type = nucleic_acid_type,
+        genome_obj = genome_obj,
+        bkg_min_dist = bkg_min_dist,
+        bkg_iter = bkg_iter,
+        bkg_max_dist = bkg_max_dist,
+        scramble_bkg = scramble_bkg,
+        extension = extension
     )
     if (scramble_bkg) {
-      message("Generated average background K-mer profile using local shifting with scrambling.")
+        message("Background generated (local shift ",
+                "+ scrambling).")
     } else {
-      message("Generated average background K-mer profile using local shifting (no scrambling).")
-    }
-  } else if (background_type_lower == "global") {
-    bkg_file <- paste0("motif_counts_", K, "mer.txt")
-
-    # Resolve path: first check installed package, then local development folder
-    bkg_path <- system.file("extdata", bkg_file, package = "RBPSpecificity")
-    if (bkg_path == "") {
-      # Fallback for local development/testing before installation
-      bkg_path <- file.path("inst", "extdata", bkg_file)
+        message("Background generated (local shift).")
     }
 
-    if (!file.exists(bkg_path)) {
-      stop("Global background file '", bkg_file, "' not found in inst/extdata or package extdata.")
-    }
-
-    message("Loading global background from '", bkg_path, "' for region: ", global_background_region)
-    bkg_data <- utils::read.table(bkg_path, header = TRUE, sep = "\t", stringsAsFactors = FALSE, check.names = FALSE)
-
-    if (!(global_background_region %in% colnames(bkg_data))) {
-      stop(
-        "Region '", global_background_region, "' not found in global background file. ",
-        "Available regions: ", paste(colnames(bkg_data)[-1], collapse = ", ")
-      )
-    }
-
-    bkg_kmer_counts <- data.frame(
-      MOTIF = bkg_data$Motif,
-      AVG_BKG_COUNT = bkg_data[[global_background_region]],
-      stringsAsFactors = FALSE
+    # --- 4. Enrichment Calculation ---
+    message("\n--- Phase 4: Computing Enrichment ---")
+    results <- calEnrichment(
+        peak_counts_df = peak_kmer_counts,
+        bkg_data = bkg_kmer_counts,
+        method = method
     )
+    message("Enrichment computed using '",
+            method, "' method.")
 
-    # Convert motifs to RNA if requested
-    if (toupper(nucleic_acid_type) == "RNA") {
-      bkg_kmer_counts$MOTIF <- gsub("T", "U", bkg_kmer_counts$MOTIF)
-    }
-
-    message("Successfully loaded global background profile.")
-  } else {
-    stop("Invalid 'background_type': must be 'local' or 'global'.")
-  }
-
-  # --- 4. Enrichment and Normalization ---
-  message("\n--- Phase 4: Calculating Final Enrichment Scores ---")
-  enrichment_scores <- calEnrichment(peak_kmer_counts_df = peak_kmer_counts, avg_bkg_counts_df = bkg_kmer_counts, method = enrichment_method)
-  message("Calculated enrichment using '", enrichment_method, "' method.")
-
-  if (log_transform) {
-    message("Applying log-transformation to scores (scaling to [1,e] then taking natural log).")
-    scores_scaled_to_exp <- normalizeScores(enrichment_scores$EnrichmentScore, method = "min_max", a = 1, b = exp(1))
-    final_scores <- log(scores_scaled_to_exp)
-  } else {
-    message("Applying direct '", normalization_method, "' normalization.")
-    # This is the old, direct normalization method
-    final_scores <- normalizeScores(scores = enrichment_scores$EnrichmentScore, method = normalization_method, ...)
-  }
-
-  # --- 5. Return Final Data Frame ---
-  results_df <- data.frame(
-    MOTIF = enrichment_scores$MOTIF,
-    Score = final_scores
-  )
-
-  # In case normalization produced NaNs (e.g., z-score on constant values), replace with 0
-  results_df$Score[is.nan(results_df$Score)] <- 0
-
-  message("\n--- Workflow Complete ---")
-  return(results_df)
+    message("\n--- Workflow Complete ---")
+    return(results)
 }
 
 #-------------------------------------------------------------------------------

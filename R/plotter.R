@@ -1,4 +1,4 @@
-﻿# Plotting functions for visualization
+# Plotting functions for visualization
 
 #' Plot Inherent Specificity (IS) Distribution
 #'
@@ -55,7 +55,7 @@ plotIS <- function(motif_enrichment, motif = NULL, bins = 50, ...) {
     ggplot2::labs(
       title = "Distribution of K-mer Enrichment Scores",
       subtitle = paste("Target Motif:", target_motif),
-      x = "Normalized Enrichment Score",
+      x = "Enrichment Score",
       y = "Frequency"
     ) +
     ggplot2::theme_bw() +

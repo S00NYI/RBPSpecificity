@@ -676,11 +676,17 @@ getSequence <- function(granges_obj, genome_obj, extension = c(0, 0), min_length
 #'   generation. Accepted values are "DNA" (using A,C,G,T) or "RNA"
 #'   (using A,C,G,U). The input is case-insensitive. Default: "DNA".
 #'
-#' @return A data frame with two columns: 'MOTIF' (character, all possible
-#'   K-mers in uppercase) and 'COUNT' (integer). 'COUNT' is the total
-#'   count of each K-mer across all input sequences. Returns a data frame
-#'   with all possible K-mers and 0 counts if input sequences are empty or
-#'   if all sequences are shorter than K.
+#' @return A data frame with four columns:
+#'   \describe{
+#'     \item{MOTIF}{Character, all possible K-mers in uppercase.}
+#'     \item{COUNT}{Integer, total occurrences of each K-mer across
+#'       all input sequences (ANR counting).}
+#'     \item{SEQ_WITH_MOTIF}{Integer, number of sequences containing
+#'       the K-mer at least once (ZOOPS counting).}
+#'     \item{SEQ_TOTAL}{Integer, total number of input sequences.}
+#'   }
+#'   Returns a data frame with all possible K-mers and 0 counts if
+#'   input sequences are empty or all shorter than K.
 #'
 #' @importFrom Biostrings DNAStringSet PDict vcountPDict
 #' @importFrom S4Vectors elementNROWS
@@ -728,19 +734,25 @@ countKmers <- function(sequences, K, type = "DNA") {
 
   # oligonucleotideFrequency returns a matrix with length(sequences) rows.
   # colSums sums counts over all sequences in the DNAStringSet.
-  # This returns counts for all possible K-mers of length K in the alphabet.
-  kmer_counts <- colSums(Biostrings::oligonucleotideFrequency(sequences, width = K))
+  freq_matrix <- Biostrings::oligonucleotideFrequency(
+      sequences, width = K
+  )
+  kmer_counts <- colSums(freq_matrix)
+  kmer_presence <- colSums(freq_matrix > 0L)
+  n_seqs <- nrow(freq_matrix)
 
   # Create and return results data frame
   results_df <- data.frame(
-    MOTIF = names(kmer_counts),
-    COUNT = as.integer(kmer_counts),
-    stringsAsFactors = FALSE
+      MOTIF = names(kmer_counts),
+      COUNT = as.integer(kmer_counts),
+      SEQ_WITH_MOTIF = as.integer(kmer_presence),
+      SEQ_TOTAL = as.integer(n_seqs),
+      stringsAsFactors = FALSE
   )
 
   # If type is RNA, replace T with U in motifs
   if (type_upper == "RNA") {
-    results_df$MOTIF <- gsub("T", "U", results_df$MOTIF)
+      results_df$MOTIF <- gsub("T", "U", results_df$MOTIF)
   }
 
   return(results_df)

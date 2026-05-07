@@ -4,42 +4,28 @@
 \alias{calEnrichment}
 \title{Calculate Background-Corrected K-mer Enrichment}
 \usage{
-calEnrichment(
-  peak_kmer_counts_df,
-  avg_bkg_counts_df,
-  method = "subtract",
-  pseudocount = 1
-)
+calEnrichment(peak_counts_df, bkg_data, method = "zoops", pseudocount = 1e-04)
 }
 \arguments{
-\item{peak_kmer_counts_df}{A data frame with 'MOTIF' and 'COUNT' columns,
-representing K-mer counts from the primary (e.g., peak) sequences. Typically
-the output of `countKmers()`.}
+\item{peak_counts_df}{Data frame from \code{countKmers()}, with
+columns MOTIF, COUNT, SEQ_WITH_MOTIF, SEQ_TOTAL.}
 
-\item{avg_bkg_counts_df}{A data frame with 'MOTIF' and 'AVG_BKG_COUNT' columns,
-representing averaged K-mer counts from background regions. Typically the
-output of `countKmersBkg()`.}
+\item{bkg_data}{List from \code{countKmersBkg()}, with elements
+MOTIF, bkg_total_count, bkg_presence_count, bkg_total_seqs.}
 
-\item{method}{Character string (case-insensitive) specifying the enrichment
-calculation method. Supported: "subtract" (default), "fold_change",
-"log2_fold_change".}
+\item{method}{Character, "zoops" or "anr". Default: "zoops".}
 
-\item{pseudocount}{Numeric, a small value added to both peak and background
-counts when using "fold_change" or "log2_fold_change" methods to avoid
-division by zero or log of zero. Default: 1.}
+\item{pseudocount}{Numeric, added to fractions/rates before
+log2 to avoid log(0). Default: 1e-4.}
 }
 \value{
-A data frame with 'MOTIF' and 'EnrichmentScore' columns.
+A data frame with 10 columns: MOTIF, Score, log2FC,
+  pvalue, padj, target_fraction, bkg_fraction,
+  target_occurence, bkg_occurence, multiplicity.
 }
 \description{
-Calculates enrichment scores by comparing K-mer counts from
-  actual peaks against averaged background K-mer counts using a specified method.
+Computes enrichment scores comparing peak K-mer
+  counts against background using either ZOOPS (per-sequence
+  presence) or ANR (total occurrence) models.
 }
-\keyword{#}
-\keyword{Helper}
-\keyword{for}
-\keyword{function}
 \keyword{internal}
-\keyword{main}
-\keyword{motifEnrichment}
-\keyword{the}

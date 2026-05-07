@@ -9,107 +9,86 @@ motifEnrichment(
   species_or_build,
   K,
   extension = c(0, 0),
-  enrichment_method = "subtract",
-  normalization_method = "min_max",
-  log_transform = TRUE,
+  method = "zoops",
   bkg_iter = 100,
   bkg_min_dist = 500,
   bkg_max_dist = 1000,
   scramble_bkg = TRUE,
-  nucleic_acid_type = "DNA",
-  background_type = "local",
-  global_background_region = "WholeGenome",
-  ...
+  nucleic_acid_type = "DNA"
 )
 }
 \arguments{
-\item{coordinates}{A data frame or GRanges object containing genomic coordinates.
-If a data frame, it must contain columns for chromosome, start, and end.}
+\item{coordinates}{A data frame or GRanges object with genomic
+coordinates. Data frames need chr, start, end columns.}
 
-\item{species_or_build}{Character string identifying the genome build (e.g.,
-"hg38", "mm10"). This is used to load the appropriate BSgenome package.}
+\item{species_or_build}{Character, genome build (e.g. "hg38").}
 
-\item{K}{Integer, the length of the K-mers to analyze (e.g., 5).}
+\item{K}{Integer, K-mer length (e.g. 5).}
 
-\item{extension}{A numeric vector of length 2: `c(five_prime, three_prime)`.
-Positive values extend, negative values trim. Extension/trimming is strand-aware.
-Default: `c(0, 0)` (no change).}
+\item{extension}{Numeric vector of length 2:
+c(five_prime, three_prime). Positive extends, negative trims.
+Default: c(0, 0).}
 
-\item{enrichment_method}{Character string, the method for calculating enrichment.
-Supported: "subtract" (default), "fold_change", "log2_fold_change".}
+\item{method}{Character, enrichment model: "zoops" (default)
+for per-sequence presence or "anr" for total occurrences.}
 
-\item{normalization_method}{Character string, the method for normalizing the final
-enrichment scores. Supported: "min_max" (default), "z_score", "log2", "none".}
+\item{bkg_iter}{Integer, background iterations. Default: 100.}
 
-\item{log_transform}{Logical, if TRUE, applies a log transformation after scaling,
-mimicking the original analysis script's method (min-max to [1,e] then log).
-If FALSE, performs only the specified `normalization_method`. Default: TRUE.}
+\item{bkg_min_dist}{Integer, min shift distance. Default: 500.}
 
-\item{bkg_iter}{Integer, the number of background iterations to perform for averaging.
-Default: 100.}
+\item{bkg_max_dist}{Integer, max shift distance. Default: 1000.}
 
-\item{bkg_min_dist}{Integer, the minimum distance (in base pairs) to shift peaks when
-creating background regions. Default: 500.}
+\item{scramble_bkg}{Logical, scramble background sequences.
+Default: TRUE.}
 
-\item{bkg_max_dist}{Integer, the maximum distance for shifting peaks. Default: 1000.}
-
-\item{scramble_bkg}{Logical, if TRUE (default), scrambles background sequences after
-shifting. Set to FALSE for faster execution when using local background only.}
-
-\item{nucleic_acid_type}{Character string, "DNA" or "RNA". Determines the alphabet
-for K-mer generation. Default: "DNA".}
-
-\item{background_type}{Character string, "local" (default) or "global".
-- "local": Generates background by shifting (and optionally scrambling) peak regions.
-- "global": Uses pre-calculated motif counts from specific genomic regions
-  stored in the package (supporting K=4, 5, 6, 7).
-If `global_background_region` is explicitly provided, this defaults to "global".}
-
-\item{global_background_region}{Character string, the region to use for global
-background. Supported: "WholeGenome" (default), "5UTR", "CDS", "3UTR", "introns", "exons".
-Providing this argument will automatically switch `background_type` to "global"
-unless otherwise specified.}
-
-\item{...}{Additional arguments passed to `normalizeScores()` (e.g., `a=0, b=1`
-for min-max normalization).}
+\item{nucleic_acid_type}{Character, "DNA" or "RNA".
+Default: "DNA".}
 }
 \value{
-A data frame containing two columns: 'MOTIF' (all possible K-mers) and
-  'Score' (the final, normalized enrichment score).
+A data frame with 10 columns:
+  \describe{
+    \item{MOTIF}{K-mer sequence.}
+    \item{Score}{Min-max normalized log2FC, range [0, 1].}
+    \item{log2FC}{Log2 fold-change (method-specific).}
+    \item{pvalue}{Statistical significance (method-specific).}
+    \item{padj}{Benjamini-Hochberg adjusted p-value.}
+    \item{target_fraction}{Fraction of peak sequences
+      containing the motif (ZOOPS).}
+    \item{bkg_fraction}{Fraction of background sequences
+      containing the motif (ZOOPS).}
+    \item{target_occurence}{Total motif occurrences in peaks.}
+    \item{bkg_occurence}{Background occurrence rate
+      (per sequence).}
+    \item{multiplicity}{Average occurrences per containing
+      sequence.}
+  }
 }
 \description{
-This is the main workflow function for the RBPSpecificity package. It processes
-RBP binding peak data (e.g., from eCLIP experiments) to calculate normalized,
-background-corrected enrichment scores for all K-mers of a given length.
+Main workflow function for RBPSpecificity. Processes RBP
+binding peak data to calculate background-corrected K-mer
+enrichment scores using either ZOOPS (per-sequence presence)
+or ANR (total occurrence) statistical models.
 }
 \details{
 The workflow proceeds as follows:
-1.  Parses input coordinate data into a standardized GRanges object.
-2.  Loads the specified BSgenome object for sequence retrieval.
-3.  Extracts sequences for peak regions, applying optional extension/trimming.
-4.  Counts K-mers within the peak sequences.
-5.  Generates an averaged K-mer profile from multiple background sets. Background
-    sets are created by shifting and scrambling genomic regions.
-6.  Calculates enrichment scores by comparing peak counts to background counts.
-7.  Normalizes the final enrichment scores to a standard scale.
+1. Parses input coordinates into a GRanges object.
+2. Loads the specified BSgenome for sequence retrieval.
+3. Extracts peak sequences with optional extension/trimming.
+4. Counts K-mers (both total and per-sequence presence).
+5. Generates background K-mer profiles from shifted regions.
+6. Computes enrichment with statistical testing.
 }
 \examples{
-\dontrun{
-# Option 1: Using Local Background (default, with scrambling)
-res_local <- motifEnrichment(my_coords, "hg38", K = 5)
-
-# Option 2: Using Local Background without scrambling (faster)
-res_local_fast <- motifEnrichment(my_coords, "hg38", K = 5, scramble_bkg = FALSE)
-
-# Option 3: Using Global Background (automatically switched by providing region)
-res_global <- motifEnrichment(my_coords, "hg38", K = 5, global_background_region = "5UTR")
-
-# Option 4: Explicit Global Background
-res_global_explicit <- motifEnrichment(
-  coordinates = my_coords,
-  species_or_build = "hg38",
-  K = 5,
-  background_type = "global"
-)
+\donttest{
+peaks_file <- system.file("extdata",
+    "eCLIP_Peaks_HNRNPC.bed",
+    package = "RBPSpecificity")
+peaks <- read.table(peaks_file,
+    header = FALSE, sep = "\t")
+colnames(peaks) <- c("chr", "start", "end",
+    "name", "score", "strand")
+result <- motifEnrichment(peaks, "hg38", K = 5,
+    method = "zoops", bkg_iter = 5)
+head(result)
 }
 }

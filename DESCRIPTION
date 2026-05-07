@@ -21,11 +21,9 @@ Authors@R:
     c(person("Soon", "Yi", , "cu.soonyi@gmail.com", role = c("aut", "cre"),
              comment = c(ORCID = "0000-0002-4535-6532")),
       person("National Institutes of Health", role = "fnd", comment = "T32 GM152319"))
-RoxygenNote: 7.3.3
 Imports: 
     Biostrings,
     BSgenome,
-    dplyr,
     GenomeInfoDb,
     GenomicRanges,
     ggplot2,
@@ -41,4 +39,4 @@ Suggests:
     rmarkdown,
     testthat
 VignetteBuilder: knitr
-
+Config/roxygen2/version: 8.0.0

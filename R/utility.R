@@ -587,9 +587,11 @@ getSequence <- function(granges_obj, genome_obj, extension = c(0, 0), min_length
   new_start <- new_start[valid_idx]
   new_end <- new_end[valid_idx]
 
-  # Update coordinates
-  GenomicRanges::start(current_gr) <- new_start
-  GenomicRanges::end(current_gr) <- new_end
+  # Update coordinates atomically to avoid intermediate invalid widths
+  IRanges::ranges(current_gr) <- IRanges::IRanges(
+      start = new_start,
+      end   = new_end
+  )
 
   # Filter for valid seqlevels & trim to chromosome boundaries
   valid_seqlevels <- intersect(GenomeInfoDb::seqlevels(current_gr), GenomeInfoDb::seqlevels(genome_obj))
@@ -917,7 +919,7 @@ generateBkgSetBatched <- function(peak_gr, genome_obj, min_seq_length,
   # 3. Remove shifted regions overlapping with original peaks
   overlaps <- GenomicRanges::findOverlaps(
     shifted_gr, peak_gr,
-    type = "any", select = "all", ignore.strand = TRUE
+    type = "any", select = "all", ignore.strand = FALSE
   )
   indices_to_remove <- unique(S4Vectors::queryHits(overlaps))
   if (length(indices_to_remove) > 0) {
@@ -970,8 +972,10 @@ generateBkgSetBatched <- function(peak_gr, genome_obj, min_seq_length,
       new_end    <- new_end[valid_ext]
     }
     if (length(shifted_gr) == 0) return(empty_result)
-    GenomicRanges::start(shifted_gr) <- new_start
-    GenomicRanges::end(shifted_gr)   <- new_end
+    IRanges::ranges(shifted_gr) <- IRanges::IRanges(
+        start = new_start,
+        end   = new_end
+    )
   }
 
   # 5. Trim to chromosome boundaries and filter by min length

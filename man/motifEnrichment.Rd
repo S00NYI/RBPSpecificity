@@ -9,11 +9,11 @@ motifEnrichment(
   species_or_build,
   K,
   extension = c(0, 0),
-  method = "zoops",
+  method = "anr",
   bkg_iter = 100,
   bkg_min_dist = 500,
   bkg_max_dist = 1000,
-  scramble_bkg = TRUE,
+  scramble_bkg = FALSE,
   nucleic_acid_type = "DNA"
 )
 }
@@ -29,8 +29,8 @@ coordinates. Data frames need chr, start, end columns.}
 c(five_prime, three_prime). Positive extends, negative trims.
 Default: c(0, 0).}
 
-\item{method}{Character, enrichment model: "zoops" (default)
-for per-sequence presence or "anr" for total occurrences.}
+\item{method}{Character, enrichment model: "anr" (default)
+for total occurrences or "zoops" for per-sequence presence.}
 
 \item{bkg_iter}{Integer, background iterations. Default: 100.}
 
@@ -38,8 +38,8 @@ for per-sequence presence or "anr" for total occurrences.}
 
 \item{bkg_max_dist}{Integer, max shift distance. Default: 1000.}
 
-\item{scramble_bkg}{Logical, scramble background sequences.
-Default: TRUE.}
+\item{scramble_bkg}{Logical, scramble background sequences
+to control for nucleotide composition. Default: FALSE.}
 
 \item{nucleic_acid_type}{Character, "DNA" or "RNA".
 Default: "DNA".}
@@ -66,8 +66,8 @@ A data frame with 10 columns:
 \description{
 Main workflow function for RBPSpecificity. Processes RBP
 binding peak data to calculate background-corrected K-mer
-enrichment scores using either ZOOPS (per-sequence presence)
-or ANR (total occurrence) statistical models.
+enrichment scores using either ANR (total occurrence) or
+ZOOPS (per-sequence presence) statistical models.
 }
 \details{
 The workflow proceeds as follows:
@@ -77,18 +77,32 @@ The workflow proceeds as follows:
 4. Counts K-mers (both total and per-sequence presence).
 5. Generates background K-mer profiles from shifted regions.
 6. Computes enrichment with statistical testing.
+
+\bold{ANR vs. ZOOPS Motif Occurrence Models:}
+Two statistical models are available via the \code{method} parameter:
+\itemize{
+  \item \bold{ANR (Any Number of Repetitions)}: Counts every occurrence
+  of a motif within each sequence (retains multiplicity). Enrichment is
+  evaluated using a conditional binomial test on aggregate occurrence
+  counts, under the assumption that occurrences are Poisson-distributed.
+  \item \bold{ZOOPS (Zero-or-One Occurrence Per Sequence)}: Treats each
+  sequence as a binary outcome (motif present or absent). Enrichment is
+  evaluated using the cumulative hypergeometric distribution.
+}
+ANR is sensitive to motif multiplicity and cooperative binding hotspots,
+whereas ZOOPS is robust to repetitive elements and compositional noise.
 }
 \examples{
 \donttest{
 peaks_file <- system.file("extdata",
-    "eCLIP_Peaks_HNRNPC.bed",
+    "ENCODE_eCLIP_HNRNPC_K562_narrowPeak.bed",
     package = "RBPSpecificity")
 peaks <- read.table(peaks_file,
     header = FALSE, sep = "\t")
 colnames(peaks) <- c("chr", "start", "end",
     "name", "score", "strand")
 result <- motifEnrichment(peaks, "hg38", K = 5,
-    method = "zoops", bkg_iter = 5)
+    method = "anr", bkg_iter = 5)
 head(result)
 }
 }

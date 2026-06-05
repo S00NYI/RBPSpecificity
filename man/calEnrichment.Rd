@@ -4,7 +4,7 @@
 \alias{calEnrichment}
 \title{Calculate Background-Corrected K-mer Enrichment}
 \usage{
-calEnrichment(peak_counts_df, bkg_data, method = "zoops", pseudocount = 1e-04)
+calEnrichment(peak_counts_df, bkg_data, method = "anr", pseudocount = 1e-04)
 }
 \arguments{
 \item{peak_counts_df}{Data frame from \code{countKmers()}, with
@@ -13,7 +13,7 @@ columns MOTIF, COUNT, SEQ_WITH_MOTIF, SEQ_TOTAL.}
 \item{bkg_data}{List from \code{countKmersBkg()}, with elements
 MOTIF, bkg_total_count, bkg_presence_count, bkg_total_seqs.}
 
-\item{method}{Character, "zoops" or "anr". Default: "zoops".}
+\item{method}{Character, "anr" (default) or "zoops".}
 
 \item{pseudocount}{Numeric, added to fractions/rates before
 log2 to avoid log(0). Default: 1e-4.}
@@ -21,11 +21,13 @@ log2 to avoid log(0). Default: 1e-4.}
 \value{
 A data frame with 10 columns: MOTIF, Score, log2FC,
   pvalue, padj, target_fraction, bkg_fraction,
-  target_occurence, bkg_occurence, multiplicity.
+  target_occurence, bkg_occurence, multiplicity. Score is
+  min-max normalized enrichment difference (fraction
+  difference for ZOOPS, rate difference for ANR).
 }
 \description{
 Computes enrichment scores comparing peak K-mer
-  counts against background using either ZOOPS (per-sequence
-  presence) or ANR (total occurrence) models.
+  counts against background using either ANR (total occurrence)
+  or ZOOPS (per-sequence presence) models.
 }
 \keyword{internal}

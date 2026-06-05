@@ -207,14 +207,14 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
 #' Calculate Background-Corrected K-mer Enrichment
 #'
 #' @description Computes enrichment scores comparing peak K-mer
-#'   counts against background using either ZOOPS (per-sequence
-#'   presence) or ANR (total occurrence) models.
+#'   counts against background using either ANR (total occurrence)
+#'   or ZOOPS (per-sequence presence) models.
 #'
 #' @param peak_counts_df Data frame from \code{countKmers()}, with
 #'   columns MOTIF, COUNT, SEQ_WITH_MOTIF, SEQ_TOTAL.
 #' @param bkg_data List from \code{countKmersBkg()}, with elements
 #'   MOTIF, bkg_total_count, bkg_presence_count, bkg_total_seqs.
-#' @param method Character, "zoops" or "anr". Default: "zoops".
+#' @param method Character, "anr" (default) or "zoops".
 #' @param pseudocount Numeric, added to fractions/rates before
 #'   log2 to avoid log(0). Default: 1e-4.
 #'
@@ -227,7 +227,7 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
 #' @importFrom stats phyper pbinom p.adjust
 #' @keywords internal
 calEnrichment <- function(peak_counts_df, bkg_data,
-                          method = "zoops",
+                          method = "anr",
                           pseudocount = 1e-4) {
     method <- match.arg(tolower(method), c("zoops", "anr"))
 
@@ -303,8 +303,8 @@ calEnrichment <- function(peak_counts_df, bkg_data,
 #' @description
 #' Main workflow function for RBPSpecificity. Processes RBP
 #' binding peak data to calculate background-corrected K-mer
-#' enrichment scores using either ZOOPS (per-sequence presence)
-#' or ANR (total occurrence) statistical models.
+#' enrichment scores using either ANR (total occurrence) or
+#' ZOOPS (per-sequence presence) statistical models.
 #'
 #' @details
 #' The workflow proceeds as follows:
@@ -315,6 +315,20 @@ calEnrichment <- function(peak_counts_df, bkg_data,
 #' 5. Generates background K-mer profiles from shifted regions.
 #' 6. Computes enrichment with statistical testing.
 #'
+#' \bold{ANR vs. ZOOPS Motif Occurrence Models:}
+#' Two statistical models are available via the \code{method} parameter:
+#' \itemize{
+#'   \item \bold{ANR (Any Number of Repetitions)}: Counts every occurrence
+#'   of a motif within each sequence (retains multiplicity). Enrichment is
+#'   evaluated using a conditional binomial test on aggregate occurrence
+#'   counts, under the assumption that occurrences are Poisson-distributed.
+#'   \item \bold{ZOOPS (Zero-or-One Occurrence Per Sequence)}: Treats each
+#'   sequence as a binary outcome (motif present or absent). Enrichment is
+#'   evaluated using the cumulative hypergeometric distribution.
+#' }
+#' ANR is sensitive to motif multiplicity and cooperative binding hotspots,
+#' whereas ZOOPS is robust to repetitive elements and compositional noise.
+#'
 #' @param coordinates A data frame or GRanges object with genomic
 #'   coordinates. Data frames need chr, start, end columns.
 #' @param species_or_build Character, genome build (e.g. "hg38").
@@ -322,13 +336,13 @@ calEnrichment <- function(peak_counts_df, bkg_data,
 #' @param extension Numeric vector of length 2:
 #'   c(five_prime, three_prime). Positive extends, negative trims.
 #'   Default: c(0, 0).
-#' @param method Character, enrichment model: "zoops" (default)
-#'   for per-sequence presence or "anr" for total occurrences.
+#' @param method Character, enrichment model: "anr" (default)
+#'   for total occurrences or "zoops" for per-sequence presence.
 #' @param bkg_iter Integer, background iterations. Default: 100.
 #' @param bkg_min_dist Integer, min shift distance. Default: 500.
 #' @param bkg_max_dist Integer, max shift distance. Default: 1000.
-#' @param scramble_bkg Logical, scramble background sequences.
-#'   Default: TRUE.
+#' @param scramble_bkg Logical, scramble background sequences
+#'   to control for nucleotide composition. Default: FALSE.
 #' @param nucleic_acid_type Character, "DNA" or "RNA".
 #'   Default: "DNA".
 #'
@@ -354,25 +368,25 @@ calEnrichment <- function(peak_counts_df, bkg_data,
 #' @examples
 #' \donttest{
 #' peaks_file <- system.file("extdata",
-#'     "eCLIP_Peaks_HNRNPC.bed",
+#'     "ENCODE_eCLIP_HNRNPC_K562_narrowPeak.bed",
 #'     package = "RBPSpecificity")
 #' peaks <- read.table(peaks_file,
 #'     header = FALSE, sep = "\t")
 #' colnames(peaks) <- c("chr", "start", "end",
 #'     "name", "score", "strand")
 #' result <- motifEnrichment(peaks, "hg38", K = 5,
-#'     method = "zoops", bkg_iter = 5)
+#'     method = "anr", bkg_iter = 5)
 #' head(result)
 #' }
 motifEnrichment <- function(coordinates,
                             species_or_build,
                             K,
                             extension = c(0, 0),
-                            method = "zoops",
+                            method = "anr",
                             bkg_iter = 100,
                             bkg_min_dist = 500,
                             bkg_max_dist = 1000,
-                            scramble_bkg = TRUE,
+                            scramble_bkg = FALSE,
                             nucleic_acid_type = "DNA") {
     # --- 1. Input Validation ---
     message("--- Phase 1: Validating Inputs ---")

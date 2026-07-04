@@ -18,11 +18,17 @@ generation. Accepted values are "DNA" (using A,C,G,T) or "RNA"
 (using A,C,G,U). The input is case-insensitive. Default: "DNA".}
 }
 \value{
-A data frame with two columns: 'MOTIF' (character, all possible
-  K-mers in uppercase) and 'COUNT' (integer). 'COUNT' is the total
-  count of each K-mer across all input sequences. Returns a data frame
-  with all possible K-mers and 0 counts if input sequences are empty or
-  if all sequences are shorter than K.
+A data frame with four columns:
+  \describe{
+    \item{MOTIF}{Character, all possible K-mers in uppercase.}
+    \item{COUNT}{Integer, total occurrences of each K-mer across
+      all input sequences (ANR counting).}
+    \item{SEQ_WITH_MOTIF}{Integer, number of sequences containing
+      the K-mer at least once (ZOOPS counting).}
+    \item{SEQ_TOTAL}{Integer, total number of input sequences.}
+  }
+  Returns a data frame with all possible K-mers and 0 counts if
+  input sequences are empty or all shorter than K.
 }
 \description{
 Counts occurrences of all possible K-mers of a given length

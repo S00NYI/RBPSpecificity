@@ -11,7 +11,8 @@ generateBkgSetBatched(
   bkg_min_dist,
   bkg_max_dist,
   scramble,
-  n_iter
+  n_iter,
+  extension = c(0L, 0L)
 )
 }
 \arguments{

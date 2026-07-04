@@ -14,7 +14,8 @@ countKmersBkg(
   bkg_max_dist = 1000,
   internal_min_length_for_bkg_seqs = K,
   scramble_bkg = TRUE,
-  chunk_size = NULL
+  chunk_size = NULL,
+  extension = c(0L, 0L)
 )
 }
 \arguments{
@@ -46,11 +47,17 @@ passes it as `min_length` to `getSequence`). Default is `K` from this function.}
 Set to FALSE for faster execution when scrambling is not needed.}
 }
 \value{
-A data frame with two columns: 'MOTIF' (all possible K-mers for the
-  specified type and K, in uppercase) and 'AVG_BKG_COUNT' (the average count
-  of each K-mer across all background iterations, rounded).
-  Returns a data frame with 0 counts if no valid background sequences
-  could be generated across all iterations.
+A list with four elements:
+  \describe{
+    \item{MOTIF}{Character vector of all possible K-mers.}
+    \item{bkg_total_count}{Integer vector, total occurrences of
+      each K-mer pooled across all background iterations (ANR).}
+    \item{bkg_presence_count}{Integer vector, number of background
+      sequences containing each K-mer at least once, pooled
+      across all iterations (ZOOPS).}
+    \item{bkg_total_seqs}{Integer, total number of background
+      sequences generated across all iterations.}
+  }
 }
 \description{
 This function calculates the average K-mer counts over multiple

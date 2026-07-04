@@ -3,3 +3,4 @@
 ^RBPSpecificity\.BiocCheck$
 ^RBPSpecificity\.Rproj$
 ^\.Rproj\.user$
+^\.vscode$

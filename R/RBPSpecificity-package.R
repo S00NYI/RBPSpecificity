@@ -1,4 +1,4 @@
-﻿#' RBPSpecificity: Analyze RBP Binding Specificity and Variation Sensitivity
+#' RBPSpecificity: Analyze RBP Binding Specificity and Variation Sensitivity
 #'
 #' @description
 #' The `RBPSpecificity` package provides a suite of tools for researchers
@@ -17,10 +17,10 @@
 #' The main workflow of the package revolves around the following exported functions:
 #' \itemize{
 #'   \item \code{\link{motifEnrichment}}: Calculates K-mer enrichment from peak data...
-#'   \item \code{\link{returnIS}}: Quantifies the inherent specificity (IS) of RBP...
-#'   \item \code{\link{plotIS}}: Visualizes the distribution of motif enrichment scores with annotation...
-#'   \item \code{\link{returnVS}}: Quantifies the variation sensitivity (VS) of RBP...
-#'   \item \code{\link{plotVS}}: Generates plots to visualize Variation Sensitivity
+#'   \item \code{\link{returnSpecificity}}: Quantifies the specificity of RBP...
+#'   \item \code{\link{plotSpecificity}}: Visualizes the distribution of motif enrichment scores with annotation...
+#'   \item \code{\link{returnSensitivity}}: Quantifies the sensitivity of RBP...
+#'   \item \code{\link{plotSensitivity}}: Generates plots to visualize sensitivity
 #' }
 #'
 #' @author Soon Yi \email{cu.soonyi@gmail.com}
@@ -37,11 +37,10 @@
 
 # Suppress R CMD check notes for NSE variables
 utils::globalVariables(c(
-  "COUNT", "AVG_BKG_COUNT", "MOTIF", "EnrichmentScore", "Score",
-  "Sensitivity", "Nucleotide", "."
+    "COUNT", "AVG_BKG_COUNT", "MOTIF", "EnrichmentScore", "Score",
+    "Sensitivity", "Nucleotide", "."
 ))
 
 ## usethis namespace: start
 ## usethis namespace: end
 NULL
-

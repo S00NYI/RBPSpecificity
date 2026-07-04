@@ -2,7 +2,10 @@
 title: "Introduction to RBPSpecificity"
 author: "Soon Yi"
 date: "`r Sys.Date()`"
-output: rmarkdown::html_vignette
+output: 
+  BiocStyle::html_document:
+    toc: true
+    toc_depth: 2
 vignette: >
   %\VignetteIndexEntry{Introduction to RBPSpecificity}
   %\VignetteEngine{knitr::rmarkdown}
@@ -11,13 +14,13 @@ vignette: >
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-  echo = TRUE,
-  collapse = TRUE,
-  comment = "#>",
-  fig.width = 7,
-  fig.height = 5,
-  warning = FALSE,
-  message = FALSE
+    echo = TRUE,
+    collapse = TRUE,
+    comment = "#>",
+    fig.width = 7,
+    fig.height = 5,
+    warning = FALSE,
+    message = FALSE
 )
 ```
 
@@ -26,8 +29,8 @@ knitr::opts_chunk$set(
 **RBPSpecificity** provides tools to analyze RNA-Binding Protein (RBP) binding 
 specificities from high-throughput sequencing data. This package provides tools for:
 
-- Calculating **Inherent Specificity (IS)** from k-mer enrichment data
-- Calculating **Variation Sensitivity (VS)** for top motifs
+- Calculating **Specificity** from k-mer enrichment data
+- Calculating **Sensitivity** for top motifs
 - Visualizing specificity distributions and sensitivity profiles
 - Computing enrichment scores from CLIP peak data
 
@@ -37,10 +40,10 @@ specificities from high-throughput sequencing data. This package provides tools 
 
 The package implements two key metrics for characterizing RBP binding behavior:
 
-1. **Inherent Specificity (IS)**: Quantifies how specifically an RBP binds its 
-   top motif relative to all other motifs. Higher IS indicates more specific binding.
-2. **Variation Sensitivity (VS)**: Measures how much the binding affinity 
-   changes upon single nucleotide variations in the motif. Higher VS indicates
+1. **Specificity**: Quantifies how specifically an RBP binds its 
+   top motif relative to all other motifs. Higher specificity indicates more specific binding.
+2. **Sensitivity**: Measures how much the binding affinity 
+   changes upon single nucleotide variations in the motif. Higher sensitivity indicates
    greater sensitivity to sequence changes.
 
 These metrics enable quantitative comparison of RBP binding properties across
@@ -51,14 +54,13 @@ different experimental conditions or between different RBPs.
 For a detailed description of these metrics and their biological applications, 
 please refer to:
 
-> Yi S, Singh SS, Ye X, Krishna R, Jankowsky E, Luna JM. (2025). 
+> Yi S, Singh SS, Ye X, Krishna R, Kothwela V, Jankowsky E, Luna JM. (2025). 
 > *Inherent Specificity and Mutational Sensitivity as Quantitative Metrics for RBP Binding.* 
-> bioRxiv. https://www.biorxiv.org/content/10.1101/2025.03.28.646018v2
+> bioRxiv. https://www.biorxiv.org/content/10.1101/2025.03.28.646018v4
 
 ## Sample Data
 
-The sample data included in this package were obtained from the ENCODE portal 
-(Luo et al., 2020).
+The sample data included in this package were obtained from the ENCODE portal.
 
 ### RBNS Data
 
@@ -76,14 +78,12 @@ calculated by counting K-mer appearances across extended peaks and subtracting
 background counts from randomly shifted genomic regions (up to 500 nt away). 
 Background generation was repeated 100 times for robust averaging.
 
-> Luo Y, Hitz BC, Gabdank I, et al. (2020). New developments on the Encyclopedia 
-> of DNA Elements (ENCODE) data portal. *Nucleic Acids Res.* 48, D882–D889.
-
-# Setup
+## Setup
 
 ```{r install, eval=FALSE}
-if (!requireNamespace("BiocManager", quietly = TRUE))
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
     install.packages("BiocManager")
+}
 
 BiocManager::install("RBPSpecificity")
 ```
@@ -95,7 +95,7 @@ library(ggplot2)
 
 # In Vitro Specificity from Pre-computed Enrichment Data (RBNS)
 
-This workflow demonstrates how to calculate IS and VS from pre-computed 
+This workflow demonstrates how to calculate specificity and sensitivity from pre-computed 
 enrichment scores, such as those from RBNS (RNA Bind-n-Seq) experiments.
 
 ## Loading RBNS Data
@@ -106,15 +106,16 @@ HNRNPC, PCBP2 (structural context independent), RBFOX2, and EIF4G2
 
 ```{r load-rbns}
 # Load sample RBNS data from package
-rbns_file <- system.file("extdata", "RBNS_normalized_5mer.csv", 
-                          package = "RBPSpecificity")
+rbns_file <- system.file("extdata", "RBNS_normalized_5mer.csv",
+    package = "RBPSpecificity"
+)
 rbns_data <- read.csv(rbns_file, stringsAsFactors = FALSE)
 
 # Preview the data
 head(rbns_data)
 ```
 
-## Calculating IS and VS for All Four RBPs
+## Calculating Specificity and Sensitivity for All Four RBPs
 
 The package expects a data.frame with `MOTIF` and `Score` columns:
 
@@ -123,52 +124,52 @@ rbps <- c("HNRNPC", "PCBP2", "RBFOX2", "EIF4G2")
 
 rbns_metrics <- list()
 for (rbp in rbps) {
-  rbns_enrichment <- data.frame(
-    MOTIF = rbns_data$Motif,
-    Score = rbns_data[[rbp]]
-  )
-  is_val <- returnIS(rbns_enrichment)
-  vs_val <- returnVS(rbns_enrichment, output_type = "number")
-  rbns_metrics[[rbp]] <- list(
-    enrichment = rbns_enrichment,
-    IS = is_val,
-    VS = vs_val
-  )
+    rbns_enrichment <- data.frame(
+        MOTIF = rbns_data$Motif,
+        Score = rbns_data[[rbp]]
+    )
+    is_val <- returnSpecificity(rbns_enrichment)
+    vs_val <- returnSensitivity(rbns_enrichment, output_type = "number")
+    rbns_metrics[[rbp]] <- list(
+        enrichment = rbns_enrichment,
+        Specificity = is_val,
+        Sensitivity = vs_val
+    )
 }
 
 # Display in vitro metrics
 invitro_summary <- data.frame(
-  RBP = rbps,
-  IS = sapply(rbns_metrics, function(x) round(x$IS, 2)),
-  VS = sapply(rbns_metrics, function(x) round(x$VS, 4))
+    RBP = rbps,
+    Specificity = sapply(rbns_metrics, function(x) round(x$Specificity, 2)),
+    Sensitivity = sapply(rbns_metrics, function(x) round(x$Sensitivity, 4))
 )
 print(invitro_summary)
 ```
 
 ## Visualization
 
-### IS Distribution Plots
+### Specificity Distribution Plots
 
-The `plotIS()` function displays the distribution of k-mer scores, highlighting 
-the top motif and its IS value:
+The `plotSpecificity()` function displays the distribution of k-mer scores, highlighting 
+the top motif and its specificity value:
 
 ```{r plot-is-rbns, fig.cap="Distribution of k-mer scores from RBNS data for four RBPs."}
-plotIS(rbns_metrics[["HNRNPC"]]$enrichment)
-plotIS(rbns_metrics[["PCBP2"]]$enrichment)
-plotIS(rbns_metrics[["RBFOX2"]]$enrichment)
-plotIS(rbns_metrics[["EIF4G2"]]$enrichment)
+plotSpecificity(rbns_metrics[["HNRNPC"]]$enrichment)
+plotSpecificity(rbns_metrics[["PCBP2"]]$enrichment)
+plotSpecificity(rbns_metrics[["RBFOX2"]]$enrichment)
+plotSpecificity(rbns_metrics[["EIF4G2"]]$enrichment)
 ```
 
-### VS Profile Plots
+### Sensitivity Profile Plots
 
-The `plotVS()` function visualizes how sensitive binding is to mutations at each 
+The `plotSensitivity()` function visualizes how sensitive binding is to mutations at each 
 position:
 
-```{r plot-vs-rbns, fig.cap="Variation sensitivity profiles from RBNS data for four RBPs."}
-plotVS(rbns_metrics[["HNRNPC"]]$enrichment)
-plotVS(rbns_metrics[["PCBP2"]]$enrichment)
-plotVS(rbns_metrics[["RBFOX2"]]$enrichment)
-plotVS(rbns_metrics[["EIF4G2"]]$enrichment)
+```{r plot-vs-rbns, fig.cap="Sensitivity profiles from RBNS data for four RBPs."}
+plotSensitivity(rbns_metrics[["HNRNPC"]]$enrichment)
+plotSensitivity(rbns_metrics[["PCBP2"]]$enrichment)
+plotSensitivity(rbns_metrics[["RBFOX2"]]$enrichment)
+plotSensitivity(rbns_metrics[["EIF4G2"]]$enrichment)
 ```
 
 # Cellular Specificity from De Novo Enrichment (eCLIP)
@@ -183,29 +184,31 @@ peak data using the `motifEnrichment()` function.
 > **Requirement**: This workflow requires `BSgenome.Hsapiens.UCSC.hg38` to be installed.
 
 When calculating enrichment from cellular peak data, the resulting metrics are 
-referred to as **Cellular Specificity (CS)** and **Cellular Variation 
-Sensitivity (CVS)**, as they reflect in vivo binding behavior rather than 
-intrinsic biochemical affinity.
+referred to as **Cellular Specificity** and **Cellular Sensitivity**,
+as they reflect in vivo binding behavior rather than intrinsic biochemical affinity.
 
 ## Loading Peak Data
 
 ```{r load-eclip, eval = requireNamespace("BSgenome.Hsapiens.UCSC.hg38", quietly = TRUE)}
 # Load eCLIP peaks (10-column narrowPeak format) from package
-bed_cols <- c("chr", "start", "end", "name", "score", "strand",
-              "signalValue", "pValue", "qValue", "peak")
+bed_cols <- c(
+    "chr", "start", "end", "name", "score", "strand",
+    "signalValue", "pValue", "qValue", "peak"
+)
 
 rbp_names <- c("HNRNPC", "PCBP2", "RBFOX2", "EIF4G2")
 cell_lines <- c("K562", "HepG2", "K562", "K562")
 
 peak_data <- list()
 for (i in seq_along(rbp_names)) {
-  bed_file <- system.file("extdata",
-    sprintf("ENCODE_eCLIP_%s_%s_narrowPeak.bed", rbp_names[i], cell_lines[i]),
-    package = "RBPSpecificity")
-  peaks <- read.table(bed_file, header = FALSE, sep = "\t")
-  colnames(peaks) <- bed_cols
-  peak_data[[rbp_names[i]]] <- peaks
-  message("Loaded ", nrow(peaks), " ", rbp_names[i], " peaks.")
+    bed_file <- system.file("extdata",
+        sprintf("ENCODE_eCLIP_%s_%s_narrowPeak.bed", rbp_names[i], cell_lines[i]),
+        package = "RBPSpecificity"
+    )
+    peaks <- read.table(bed_file, header = FALSE, sep = "\t")
+    colnames(peaks) <- bed_cols
+    peak_data[[rbp_names[i]]] <- peaks
+    message("Loaded ", nrow(peaks), " ", rbp_names[i], " peaks.")
 }
 ```
 
@@ -236,73 +239,67 @@ nucleotide composition.
 
 cellular_results <- list()
 for (rbp in rbp_names) {
-  message("Running motifEnrichment for ", rbp, "...")
-  enrichment <- motifEnrichment(
-    coordinates = peak_data[[rbp]],
-    species_or_build = "hg38",
-    K = 5,
-    extension = c(25, 0),
-    method = "anr",
-    bkg_iter = 100,
-    scramble_bkg = FALSE
-  )
-  
-  cs_val <- returnIS(enrichment)
-  cvs_val <- returnVS(enrichment, output_type = "number")
-  
-  cellular_results[[rbp]] <- list(
-    enrichment = enrichment,
-    CS = cs_val,
-    CVS = cvs_val
-  )
+    message("Running motifEnrichment for ", rbp, "...")
+    enrichment <- motifEnrichment(
+        coordinates = peak_data[[rbp]],
+        species_or_build = "hg38",
+        K = 5,
+        extension = c(25, 0),
+        method = "anr",
+        bkg_iter = 100,
+        scramble_bkg = FALSE
+    )
+
+    cs_val <- returnSpecificity(enrichment)
+    cvs_val <- returnSensitivity(enrichment, output_type = "number")
+
+    cellular_results[[rbp]] <- list(
+        enrichment = enrichment,
+        Specificity = cs_val,
+        Sensitivity = cvs_val
+    )
 }
 
 # Display cellular metrics
 cellular_summary <- data.frame(
-  RBP = rbp_names,
-  CS = sapply(cellular_results, function(x) round(x$CS, 2)),
-  CVS = sapply(cellular_results, function(x) round(x$CVS, 4))
+    RBP = rbp_names,
+    Specificity = sapply(cellular_results, function(x) round(x$Specificity, 2)),
+    Sensitivity = sapply(cellular_results, function(x) round(x$Sensitivity, 4))
 )
 print(cellular_summary)
 ```
 
 ## Visualization
 
-The same `plotIS()` and `plotVS()` functions used for RBNS data can be applied
-to visualize cellular specificity (CS) and cellular variation sensitivity (CVS)
-from eCLIP enrichment results:
+The same `plotSpecificity()` and `plotSensitivity()` functions used for RBNS data can be applied
+to visualize cellular specificity and cellular sensitivity from eCLIP enrichment results:
 
 ```{r eclip-plots, eval = requireNamespace("BSgenome.Hsapiens.UCSC.hg38", quietly = TRUE)}
-# CS Distribution plots
-plotIS(cellular_results[["HNRNPC"]]$enrichment)
-plotIS(cellular_results[["PCBP2"]]$enrichment)
-plotIS(cellular_results[["RBFOX2"]]$enrichment)
-plotIS(cellular_results[["EIF4G2"]]$enrichment)
+# Specificity Distribution plots
+plotSpecificity(cellular_results[["HNRNPC"]]$enrichment)
+plotSpecificity(cellular_results[["PCBP2"]]$enrichment)
+plotSpecificity(cellular_results[["RBFOX2"]]$enrichment)
+plotSpecificity(cellular_results[["EIF4G2"]]$enrichment)
 
-# CVS Profile plots
-plotVS(cellular_results[["HNRNPC"]]$enrichment)
-plotVS(cellular_results[["PCBP2"]]$enrichment)
-plotVS(cellular_results[["RBFOX2"]]$enrichment)
-plotVS(cellular_results[["EIF4G2"]]$enrichment)
+# Sensitivity Profile plots
+plotSensitivity(cellular_results[["HNRNPC"]]$enrichment)
+plotSensitivity(cellular_results[["PCBP2"]]$enrichment)
+plotSensitivity(cellular_results[["RBFOX2"]]$enrichment)
+plotSensitivity(cellular_results[["EIF4G2"]]$enrichment)
 ```
 
 # Comparing In Vitro (RBNS) vs. Cellular (eCLIP) Specificity
 
-A key application is comparing **inherent specificity** (IS/VS, from RBNS) with 
-**cellular specificity** (CS/CVS, from eCLIP). RBPs that bind directly to 
-single-stranded sequence motifs (e.g., HNRNPC, PCBP2) are expected to show 
-correlated IS/CS and VS/CVS values. RBPs whose binding depends on structural 
-context (e.g., RBFOX2, EIF4G2) may show divergence between in vitro and 
-cellular metrics.
+A key application is comparing specificity and sensitivity across in vitro and cellular contexts. RBPs that bind directly to single-stranded sequence motifs (e.g., HNRNPC, PCBP2) are expected to show correlated specificity and sensitivity values. RBPs whose binding depends on structural context (e.g., RBFOX2, EIF4G2) may show divergence between in vitro and cellular metrics.
 
 ```{r comparison, eval = requireNamespace("BSgenome.Hsapiens.UCSC.hg38", quietly = TRUE)}
 comparison <- data.frame(
-  RBP = rbp_names,
-  Structural_Context = c("Independent", "Independent", "Dependent", "Dependent"),
-  In_Vitro_IS = sapply(rbns_metrics[rbp_names], function(x) round(x$IS, 2)),
-  Cellular_CS = sapply(cellular_results, function(x) round(x$CS, 2)),
-  In_Vitro_VS = sapply(rbns_metrics[rbp_names], function(x) round(x$VS, 4)),
-  Cellular_CVS = sapply(cellular_results, function(x) round(x$CVS, 4))
+    RBP = rbp_names,
+    Structural_Context = c("Independent", "Independent", "Dependent", "Dependent"),
+    In_Vitro_Specificity = sapply(rbns_metrics[rbp_names], function(x) round(x$Specificity, 2)),
+    Cellular_Specificity = sapply(cellular_results, function(x) round(x$Specificity, 2)),
+    In_Vitro_Sensitivity = sapply(rbns_metrics[rbp_names], function(x) round(x$Sensitivity, 4)),
+    Cellular_Sensitivity = sapply(cellular_results, function(x) round(x$Sensitivity, 4))
 )
 print(comparison)
 ```

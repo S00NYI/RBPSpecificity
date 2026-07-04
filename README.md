@@ -8,7 +8,7 @@
 [![R Version](https://img.shields.io/badge/R-%3E%3D%204.3-blue)](https://cran.r-project.org/)
 <!-- badges: end -->
 
-**RBPSpecificity** provides tools to calculate Inherent Specificity (IS) and Variation Sensitivity (VS) metrics for RNA-binding proteins from enrichment data.
+**RBPSpecificity** provides tools to calculate Specificity and Sensitivity metrics for RNA-binding proteins from enrichment data.
 
 ## Installation
 
@@ -42,22 +42,22 @@ enrichment <- data.frame(
   Score = c(0.95, 0.45, 0.40)
 )
 
-# Calculate Inherent Specificity
-is_value <- returnIS(enrichment)
+# Calculate Specificity
+specificity_value <- returnSpecificity(enrichment)
 
-# Calculate Variation Sensitivity
-vs_value <- returnVS(enrichment, output_type = "number")
-vs_matrix <- returnVS(enrichment, output_type = "matrix")
+# Calculate Sensitivity
+sensitivity_value <- returnSensitivity(enrichment, output_type = "number")
+sensitivity_matrix <- returnSensitivity(enrichment, output_type = "matrix")
 
 # Visualize
-plotIS(enrichment)
-plotVS(enrichment)
+plotSpecificity(enrichment)
+plotSensitivity(enrichment)
 ```
 
 ## Features
 
-- **Inherent Specificity (IS)** - Quantify binding specificity from enrichment distributions
-- **Variation Sensitivity (VS)** - Measure sensitivity to single nucleotide changes
+- **Specificity** - Quantify binding specificity from enrichment distributions
+- **Sensitivity** - Measure sensitivity to single nucleotide changes
 - **De novo enrichment** - Calculate k-mer enrichment directly from CLIP peaks
 - **Visualization** - Distribution plots and sensitivity profiles
 
@@ -76,32 +76,32 @@ Main workflow function to calculate K-mer enrichment.
 - **scramble_bkg**: logical, scramble background sequences to control for nucleotide composition (default: FALSE).
 - **nucleic_acid_type**: "DNA" or "RNA" (default: "DNA").
 
-### `returnIS`
-Calculate Inherent Specificity (IS).
+### `returnSpecificity`
+Calculate Specificity.
 - **motif_enrichment**: result from `motifEnrichment`.
 - **motif**: target motif (default: top scoring).
 - **return_type**: "specific" (default) or "all".
 
-### `returnVS`
-Calculate Variation Sensitivity (VS).
+### `returnSensitivity`
+Calculate Sensitivity.
 - **motif_enrichment**: result from `motifEnrichment`.
 - **motif**: reference motif (default: top scoring).
 - **return_type**: "specific" (default) or "all".
 - **output_type**: "matrix" (default) or "number".
 - **sensitivity_method**: calculation method (default: "1_minus_norm_score").
 
-### `plotIS`
-Visualize IS value on score distribution.
+### `plotSpecificity`
+Visualize Specificity value on score distribution.
 - **motif_enrichment**: result from `motifEnrichment`.
 - **motif**: target motif (default: top scoring).
 - **bins**: histogram bins (default: 50).
 
-### `plotVS`
-Visualize Variation Sensitivity matrix.
+### `plotSensitivity`
+Visualize Sensitivity matrix.
 - **motif_enrichment**: result from `motifEnrichment`.
 - **motif**: reference motif (default: top scoring).
 
-> **Note**: `returnIS()`, `returnVS()`, `plotIS()`, and `plotVS()` accept any data frame with `MOTIF` and `Score` columns. Pre-computed enrichment data from RBNS, RNACompete, or other sources can be used directly without running `motifEnrichment()`, as long as the input is formatted with the correct column names and `Score` values are normalized to a [0, 1] scale.
+> **Note**: `returnSpecificity()`, `returnSensitivity()`, `plotSpecificity()`, and `plotSensitivity()` accept any data frame with `MOTIF` and `Score` columns. Pre-computed enrichment data from RBNS, RNACompete, or other sources can be used directly without running `motifEnrichment()`, as long as the input is formatted with the correct column names and `Score` values are normalized to a [0, 1] scale.
 
 ## Enrichment Calculation
 
@@ -133,7 +133,7 @@ To correct for motif, sequence, and nucleotide bias in the genomic background, `
 
 ### Output
 
-The enrichment difference (target − background) is computed for each k-mer, then min-max normalized across all k-mers to [0, 1] to produce the `Score` column. This `Score` is the primary metric consumed by `returnIS()` and `returnVS()`. The output also includes `log2FC` and `padj` (BH-adjusted p-values) as supplementary columns.
+The enrichment difference (target − background) is computed for each k-mer, then min-max normalized across all k-mers to [0, 1] to produce the `Score` column. This `Score` is the primary metric consumed by `returnSpecificity()` and `returnSensitivity()`. The output also includes `log2FC` and `padj` (BH-adjusted p-values) as supplementary columns.
 
 ## Documentation
 
@@ -149,23 +149,24 @@ https://github.com/S00NYI/BITS_Specificity
 
 ## Related Packages
 
-**RBPSpecificity** works alongside [RBPBind](https://github.com/S00NYI/RBPBind), which simulates competitive RBP binding using equilibrium kinetics. Together, these packages enable:
+**RBPSpecificity** works alongside [RBPEqBind](https://github.com/S00NYI/RBPEqBind), which simulates competitive RBP binding using equilibrium kinetics. Together, these packages enable:
 
 - Calculating specificity metrics from experimental data (RBPSpecificity)
-- Simulating competitive binding scenarios (RBPBind)
+- Simulating competitive binding scenarios (RBPEqBind)
 
 ## Citation
 
 If you use RBPSpecificity in your research, please cite:
 
-> Yi S, Singh SS, Ye X, Krishna R, Jankowsky E, Luna JM. (2025). 
+> Yi S, Singh SS, Ye X, Krishna R, Kothwela V, Jankowsky E, Luna JM. (2025). 
 > *Inherent Specificity and Mutational Sensitivity as Quantitative Metrics for RBP Binding.* 
-> bioRxiv. https://www.biorxiv.org/content/10.1101/2025.03.28.646018v2
+> bioRxiv. https://www.biorxiv.org/content/10.1101/2025.03.28.646018v4
 
-This package was developed in part with **Google Antigravity**.
+## AI Usage Disclosure
 
-For the original R implementation of RBP specificity analysis, see **Deprecated** folder in:
-https://github.com/S00NYI/BITS_Specificity
+This package's Bioconductor review remediation, API refactoring, and test suite expansion were developed in collaboration with Google Antigravity. For the original R implementation of RBP specificity analysis, see Figure_Scripts folder in the [BITS_Specificity repository](https://github.com/S00NYI/BITS_Specificity).
+
+
 
 ## Further Reading
 

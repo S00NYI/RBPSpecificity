@@ -93,16 +93,22 @@ ANR is sensitive to motif multiplicity and cooperative binding hotspots,
 whereas ZOOPS is robust to repetitive elements and compositional noise.
 }
 \examples{
-\donttest{
-peaks_file <- system.file("extdata",
-    "ENCODE_eCLIP_HNRNPC_K562_narrowPeak.bed",
-    package = "RBPSpecificity")
-peaks <- read.table(peaks_file,
-    header = FALSE, sep = "\t")
-colnames(peaks) <- c("chr", "start", "end",
-    "name", "score", "strand")
-result <- motifEnrichment(peaks, "hg38", K = 5,
-    method = "anr", bkg_iter = 5)
-head(result)
+if (requireNamespace("BSgenome.Hsapiens.UCSC.hg38", quietly = TRUE)) {
+    peaks_file <- system.file("extdata",
+        "ENCODE_eCLIP_HNRNPC_K562_narrowPeak.bed",
+        package = "RBPSpecificity"
+    )
+    peaks <- read.table(peaks_file,
+        header = FALSE, sep = "\t"
+    )
+    colnames(peaks) <- c(
+        "chr", "start", "end",
+        "name", "score", "strand"
+    )
+    result <- motifEnrichment(peaks, "hg38",
+        K = 5,
+        method = "anr", bkg_iter = 5
+    )
+    head(result)
 }
 }

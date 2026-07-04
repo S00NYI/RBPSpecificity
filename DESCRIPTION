@@ -11,7 +11,7 @@ Description:
     (see URL field or vignette).
 License: GPL-3
 Encoding: UTF-8
-biocViews: Software, MotifAnnotation, Sequencing, Coverage, GenomeAnnotation, Visualization, GeneRegulation
+biocViews: Software, MotifAnnotation, Sequencing, Coverage, GenomeAnnotation, Visualization, GeneRegulation, KEGG
 BugReports: https://github.com/S00NYI/RBPSpecificity/issues
 URL:
     https://www.biorxiv.org/content/10.1101/2025.03.28.646018v2,
@@ -21,6 +21,8 @@ Authors@R:
     c(person("Soon", "Yi", , "cu.soonyi@gmail.com", role = c("aut", "cre"),
              comment = c(ORCID = "0000-0002-4535-6532")),
       person("National Institutes of Health", role = "fnd", comment = "T32 GM152319"))
+Depends:
+    R (>= 4.6.0)
 Imports: 
     Biostrings,
     BSgenome,
@@ -33,6 +35,7 @@ Imports:
     stats,
     utils
 Suggests: 
+    BiocStyle,
     BSgenome.Hsapiens.UCSC.hg38,
     IRanges,
     knitr,

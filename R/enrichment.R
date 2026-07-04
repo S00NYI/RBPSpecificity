@@ -48,159 +48,162 @@ countKmersBkg <- function(original_peak_gr, K, type = "DNA", genome_obj,
                           bkg_min_dist = 500, bkg_iter = 100, bkg_max_dist = 1000,
                           internal_min_length_for_bkg_seqs = K, scramble_bkg = TRUE,
                           chunk_size = NULL, extension = c(0L, 0L)) {
-  # --- Input Validation ---
-  if (!methods::is(original_peak_gr, "GRanges") || length(original_peak_gr) == 0) {
-    stop("'original_peak_gr' must be a non-empty GRanges object.")
-  }
-  if (!is.numeric(bkg_iter) || length(bkg_iter) != 1 || bkg_iter <= 0 || bkg_iter %% 1 != 0) {
-    stop("'bkg_iter' must be a single positive integer.")
-  }
-  if (!is.numeric(internal_min_length_for_bkg_seqs) || length(internal_min_length_for_bkg_seqs) != 1 ||
-    internal_min_length_for_bkg_seqs < 1 || internal_min_length_for_bkg_seqs %% 1 != 0) {
-    stop("'internal_min_length_for_bkg_seqs' must be a single positive integer.")
-  }
-  if (internal_min_length_for_bkg_seqs < K) {
-    warning(
-      "'internal_min_length_for_bkg_seqs' (", internal_min_length_for_bkg_seqs,
-      ") is less than K (", K, "). Background sequences might be too short for K-mer counting."
-    )
-  }
-
-  message("Note: During background generation, any regions shorter than K=", K, " will be removed.")
-
-  # --- Auto-calculate chunk_size for memory safety ---
-  if (is.null(chunk_size)) {
-    num_peaks <- length(original_peak_gr)
-    num_kmers <- 4^K
-    # Target ~1 GB for the oligonucleotideFrequency matrix
-    # Matrix size per iteration = num_peaks * num_kmers * 4 bytes (integer)
-    bytes_per_iter <- as.numeric(num_peaks) * num_kmers * 4
-    if (bytes_per_iter > 0) {
-      chunk_size <- max(1L, as.integer(floor(1e9 / bytes_per_iter)))
-    } else {
-      chunk_size <- bkg_iter
+    # --- Input Validation ---
+    if (!methods::is(original_peak_gr, "GRanges") || length(original_peak_gr) == 0) {
+        stop("'original_peak_gr' must be a non-empty GRanges object.")
     }
-    chunk_size <- min(chunk_size, bkg_iter)
-  }
-
-  # --- Template k-mers ---
-  template_kmers_df <- suppressMessages(countKmers(sequences = Biostrings::DNAStringSet(), K = K, type = type))
-  all_kmers_vector <- template_kmers_df$MOTIF
-
-  if (length(all_kmers_vector) == 0 && K > 0) {
-    stop("Could not generate the K-mer universe template. Check K and type parameters for countKmers.")
-  }
-
-  # --- Accumulator matrices ---
-  counts_accumulator_matrix <- matrix(0L,
-      nrow = length(all_kmers_vector),
-      ncol = bkg_iter,
-      dimnames = list(all_kmers_vector, NULL)
-  )
-  presence_accumulator_matrix <- matrix(0L,
-      nrow = length(all_kmers_vector),
-      ncol = bkg_iter,
-      dimnames = list(all_kmers_vector, NULL)
-  )
-  total_bkg_seqs <- 0L
-
-  valid_iterations_count <- 0
-
-  message("Generating average background K-mer profile over ", bkg_iter,
-          " iterations (chunk_size=", chunk_size, "):")
-  pb <- utils::txtProgressBar(min = 0, max = bkg_iter, style = 3)
-
-  # --- Process in chunks ---
-  chunk_starts <- seq(1L, bkg_iter, by = chunk_size)
-
-  for (cs in chunk_starts) {
-    chunk_end <- min(cs + chunk_size - 1L, bkg_iter)
-    n_this_chunk <- chunk_end - cs + 1L
-
-    # Batched background generation for this chunk
-    bkg_result <- generateBkgSetBatched(
-      peak_gr = original_peak_gr,
-      genome_obj = genome_obj,
-      min_seq_length = internal_min_length_for_bkg_seqs,
-      bkg_min_dist = bkg_min_dist,
-      bkg_max_dist = bkg_max_dist,
-      scramble = scramble_bkg,
-      n_iter = n_this_chunk,
-      extension = extension
-    )
-
-    if (length(bkg_result$sequences) > 0) {
-      # One oligonucleotideFrequency call for entire chunk
-      freq_matrix <- Biostrings::oligonucleotideFrequency(
-          bkg_result$sequences, width = K
-      )
-
-      # ANR: total counts per iteration
-      per_iter_sums <- rowsum(
-          freq_matrix,
-          group = bkg_result$iter_tags,
-          reorder = TRUE
-      )
-
-      # ZOOPS: binary presence per iteration
-      presence_matrix <- (freq_matrix > 0L) * 1L
-      per_iter_presence <- rowsum(
-          presence_matrix,
-          group = bkg_result$iter_tags,
-          reorder = TRUE
-      )
-
-      # Map chunk-local iteration indices to global columns
-      iter_indices_in_chunk <- as.integer(
-          rownames(per_iter_sums)
-      )
-      global_col_indices <- cs + iter_indices_in_chunk - 1L
-
-      # Store in accumulators
-      counts_accumulator_matrix[
-          , global_col_indices
-      ] <- t(per_iter_sums)
-      presence_accumulator_matrix[
-          , global_col_indices
-      ] <- t(per_iter_presence)
-
-      # Track total background sequences
-      total_bkg_seqs <- total_bkg_seqs +
-          length(bkg_result$sequences)
-
-      # Count valid iterations
-      iter_totals <- rowSums(per_iter_sums)
-      valid_iterations_count <- valid_iterations_count +
-          sum(iter_totals > 0)
+    if (!is.numeric(bkg_iter) || length(bkg_iter) != 1 || bkg_iter <= 0 || bkg_iter %% 1 != 0) {
+        stop("'bkg_iter' must be a single positive integer.")
+    }
+    if (!is.numeric(internal_min_length_for_bkg_seqs) || length(internal_min_length_for_bkg_seqs) != 1 ||
+        internal_min_length_for_bkg_seqs < 1 || internal_min_length_for_bkg_seqs %% 1 != 0) {
+        stop("'internal_min_length_for_bkg_seqs' must be a single positive integer.")
+    }
+    if (internal_min_length_for_bkg_seqs < K) {
+        warning(
+            "'internal_min_length_for_bkg_seqs' (", internal_min_length_for_bkg_seqs,
+            ") is less than K (", K, "). Background sequences might be too short for K-mer counting."
+        )
     }
 
-    utils::setTxtProgressBar(pb, chunk_end)
-  }
-  close(pb)
+    message("Note: During background generation, any regions shorter than K=", K, " will be removed.")
 
-  # --- Averaging and output ---
-  if (valid_iterations_count == 0 && bkg_iter > 0) {
-    message(
-      "\nNOTE: No valid background sequences yielded counts across any of the ", bkg_iter, " iterations. ",
-      "Average background counts will be all zeros."
-    )
-  } else if (bkg_iter > 0) {
-    message(
-      "\nBackground profile generated. Averaged over ", valid_iterations_count,
-      " iterations that yielded sequences with K-mer counts."
-    )
-  }
+    # --- Auto-calculate chunk_size for memory safety ---
+    if (is.null(chunk_size)) {
+        num_peaks <- length(original_peak_gr)
+        num_kmers <- 4^K
+        # Target ~1 GB for the oligonucleotideFrequency matrix
+        # Matrix size per iteration = num_peaks * num_kmers * 4 bytes (integer)
+        bytes_per_iter <- as.numeric(num_peaks) * num_kmers * 4
+        if (bytes_per_iter > 0) {
+            chunk_size <- max(1L, as.integer(floor(1e9 / bytes_per_iter)))
+        } else {
+            chunk_size <- bkg_iter
+        }
+        chunk_size <- min(chunk_size, bkg_iter)
+    }
 
-  list(
-      MOTIF = all_kmers_vector,
-      bkg_total_count = as.integer(
-          rowSums(counts_accumulator_matrix)
-      ),
-      bkg_presence_count = as.integer(
-          rowSums(presence_accumulator_matrix)
-      ),
-      bkg_total_seqs = total_bkg_seqs
-  )
+    # --- Template k-mers ---
+    template_kmers_df <- countKmers(sequences = Biostrings::DNAStringSet(), K = K, type = type)
+    all_kmers_vector <- template_kmers_df$MOTIF
+
+    if (length(all_kmers_vector) == 0 && K > 0) {
+        stop("Could not generate the K-mer universe template. Check K and type parameters for countKmers.")
+    }
+
+    # --- Accumulator matrices ---
+    counts_accumulator_matrix <- matrix(0L,
+        nrow = length(all_kmers_vector),
+        ncol = bkg_iter,
+        dimnames = list(all_kmers_vector, NULL)
+    )
+    presence_accumulator_matrix <- matrix(0L,
+        nrow = length(all_kmers_vector),
+        ncol = bkg_iter,
+        dimnames = list(all_kmers_vector, NULL)
+    )
+    total_bkg_seqs <- 0L
+
+    valid_iterations_count <- 0
+
+    message(
+        "Generating average background K-mer profile over ", bkg_iter,
+        " iterations (chunk_size=", chunk_size, "):"
+    )
+    pb <- utils::txtProgressBar(min = 0, max = bkg_iter, style = 3)
+
+    # --- Process in chunks ---
+    chunk_starts <- seq(1L, bkg_iter, by = chunk_size)
+
+    for (cs in chunk_starts) {
+        chunk_end <- min(cs + chunk_size - 1L, bkg_iter)
+        n_this_chunk <- chunk_end - cs + 1L
+
+        # Batched background generation for this chunk
+        bkg_result <- generateBkgSetBatched(
+            peak_gr = original_peak_gr,
+            genome_obj = genome_obj,
+            min_seq_length = internal_min_length_for_bkg_seqs,
+            bkg_min_dist = bkg_min_dist,
+            bkg_max_dist = bkg_max_dist,
+            scramble = scramble_bkg,
+            n_iter = n_this_chunk,
+            extension = extension
+        )
+
+        if (length(bkg_result$sequences) > 0) {
+            # One oligonucleotideFrequency call for entire chunk
+            freq_matrix <- Biostrings::oligonucleotideFrequency(
+                bkg_result$sequences,
+                width = K
+            )
+
+            # ANR: total counts per iteration
+            per_iter_sums <- rowsum(
+                freq_matrix,
+                group = bkg_result$iter_tags,
+                reorder = TRUE
+            )
+
+            # ZOOPS: binary presence per iteration
+            presence_matrix <- (freq_matrix > 0L) * 1L
+            per_iter_presence <- rowsum(
+                presence_matrix,
+                group = bkg_result$iter_tags,
+                reorder = TRUE
+            )
+
+            # Map chunk-local iteration indices to global columns
+            iter_indices_in_chunk <- as.integer(
+                rownames(per_iter_sums)
+            )
+            global_col_indices <- cs + iter_indices_in_chunk - 1L
+
+            # Store in accumulators
+            counts_accumulator_matrix[
+                , global_col_indices
+            ] <- t(per_iter_sums)
+            presence_accumulator_matrix[
+                , global_col_indices
+            ] <- t(per_iter_presence)
+
+            # Track total background sequences
+            total_bkg_seqs <- total_bkg_seqs +
+                length(bkg_result$sequences)
+
+            # Count valid iterations
+            iter_totals <- rowSums(per_iter_sums)
+            valid_iterations_count <- valid_iterations_count +
+                sum(iter_totals > 0)
+        }
+
+        utils::setTxtProgressBar(pb, chunk_end)
+    }
+    close(pb)
+
+    # --- Averaging and output ---
+    if (valid_iterations_count == 0 && bkg_iter > 0) {
+        message(
+            "\nNOTE: No valid background sequences yielded counts across any of the ", bkg_iter, " iterations. ",
+            "Average background counts will be all zeros."
+        )
+    } else if (bkg_iter > 0) {
+        message(
+            "\nBackground profile generated. Averaged over ", valid_iterations_count,
+            " iterations that yielded sequences with K-mer counts."
+        )
+    }
+
+    list(
+        MOTIF = all_kmers_vector,
+        bkg_total_count = as.integer(
+            rowSums(counts_accumulator_matrix)
+        ),
+        bkg_presence_count = as.integer(
+            rowSums(presence_accumulator_matrix)
+        ),
+        bkg_total_seqs = total_bkg_seqs
+    )
 }
 
 
@@ -252,7 +255,7 @@ calEnrichment <- function(peak_counts_df, bkg_data,
     if (method == "zoops") {
         log2FC <- log2(
             (target_fraction + pseudocount) /
-            (bkg_fraction + pseudocount)
+                (bkg_fraction + pseudocount)
         )
         pvalue <- stats::phyper(
             q = peak_counts_df$SEQ_WITH_MOTIF - 1L,
@@ -267,7 +270,7 @@ calEnrichment <- function(peak_counts_df, bkg_data,
     } else {
         log2FC <- log2(
             (target_rate + pseudocount) /
-            (bkg_rate + pseudocount)
+                (bkg_rate + pseudocount)
         )
         p_null <- n_peak / (n_peak + n_bkg)
         pvalue <- stats::pbinom(
@@ -366,17 +369,23 @@ calEnrichment <- function(peak_counts_df, bkg_data,
 #' @export
 #'
 #' @examples
-#' \donttest{
-#' peaks_file <- system.file("extdata",
-#'     "ENCODE_eCLIP_HNRNPC_K562_narrowPeak.bed",
-#'     package = "RBPSpecificity")
-#' peaks <- read.table(peaks_file,
-#'     header = FALSE, sep = "\t")
-#' colnames(peaks) <- c("chr", "start", "end",
-#'     "name", "score", "strand")
-#' result <- motifEnrichment(peaks, "hg38", K = 5,
-#'     method = "anr", bkg_iter = 5)
-#' head(result)
+#' if (requireNamespace("BSgenome.Hsapiens.UCSC.hg38", quietly = TRUE)) {
+#'     peaks_file <- system.file("extdata",
+#'         "ENCODE_eCLIP_HNRNPC_K562_narrowPeak.bed",
+#'         package = "RBPSpecificity"
+#'     )
+#'     peaks <- read.table(peaks_file,
+#'         header = FALSE, sep = "\t"
+#'     )
+#'     colnames(peaks) <- c(
+#'         "chr", "start", "end",
+#'         "name", "score", "strand"
+#'     )
+#'     result <- motifEnrichment(peaks, "hg38",
+#'         K = 5,
+#'         method = "anr", bkg_iter = 5
+#'     )
+#'     head(result)
 #' }
 motifEnrichment <- function(coordinates,
                             species_or_build,
@@ -393,15 +402,19 @@ motifEnrichment <- function(coordinates,
     if (missing(coordinates) ||
         missing(species_or_build) ||
         missing(K)) {
-        stop("'coordinates', 'species_or_build', ",
-             "and 'K' are required.")
+        stop(
+            "'coordinates', 'species_or_build', ",
+            "and 'K' are required."
+        )
     }
     method <- match.arg(
         tolower(method), c("zoops", "anr")
     )
     if (!is.numeric(extension) || length(extension) != 2) {
-        stop("'extension' must be a numeric vector ",
-             "of length 2: c(five_prime, three_prime).")
+        stop(
+            "'extension' must be a numeric vector ",
+            "of length 2: c(five_prime, three_prime)."
+        )
     }
     extension <- as.integer(extension)
 
@@ -425,20 +438,26 @@ motifEnrichment <- function(coordinates,
         min_length = K
     )
     if (length(peak_sequences) == 0) {
-        stop("No sequences retrieved. ",
-             "Check coordinates and chromosome names.")
+        stop(
+            "No sequences retrieved. ",
+            "Check coordinates and chromosome names."
+        )
     }
-    message("Retrieved ", length(peak_sequences),
-            " sequences.")
+    message(
+        "Retrieved ", length(peak_sequences),
+        " sequences."
+    )
 
     peak_kmer_counts <- countKmers(
         sequences = peak_sequences,
         K = K,
         type = nucleic_acid_type
     )
-    message("Counted K-mers. ",
-            sum(peak_kmer_counts$COUNT > 0),
-            " non-zero K-mers.")
+    message(
+        "Counted K-mers. ",
+        sum(peak_kmer_counts$COUNT > 0),
+        " non-zero K-mers."
+    )
 
     # --- 3. Background Generation ---
     message("\n--- Phase 3: Generating Background ---")
@@ -454,8 +473,10 @@ motifEnrichment <- function(coordinates,
         extension = extension
     )
     if (scramble_bkg) {
-        message("Background generated (local shift ",
-                "+ scrambling).")
+        message(
+            "Background generated (local shift ",
+            "+ scrambling)."
+        )
     } else {
         message("Background generated (local shift).")
     }
@@ -467,8 +488,10 @@ motifEnrichment <- function(coordinates,
         bkg_data = bkg_kmer_counts,
         method = method
     )
-    message("Enrichment computed using '",
-            method, "' method.")
+    message(
+        "Enrichment computed using '",
+        method, "' method."
+    )
 
     message("\n--- Workflow Complete ---")
     return(results)

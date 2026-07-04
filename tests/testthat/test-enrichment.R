@@ -18,7 +18,8 @@ mock_bkg_data <- list(
 # --- calEnrichment tests ---
 test_that("calEnrichment returns 10-column data.frame", {
     result <- calEnrichment(
-        mock_peak_counts, mock_bkg_data, method = "zoops"
+        mock_peak_counts, mock_bkg_data,
+        method = "zoops"
     )
     expect_true(is.data.frame(result))
     expect_equal(ncol(result), 10)
@@ -31,7 +32,8 @@ test_that("calEnrichment returns 10-column data.frame", {
 
 test_that("calEnrichment ZOOPS produces valid output", {
     result <- calEnrichment(
-        mock_peak_counts, mock_bkg_data, method = "zoops"
+        mock_peak_counts, mock_bkg_data,
+        method = "zoops"
     )
 
     # Score should be [0, 1]
@@ -40,11 +42,11 @@ test_that("calEnrichment ZOOPS produces valid output", {
     # Fractions should be in [0, 1]
     expect_true(all(
         result$target_fraction >= 0 &
-        result$target_fraction <= 1
+            result$target_fraction <= 1
     ))
     expect_true(all(
         result$bkg_fraction >= 0 &
-        result$bkg_fraction <= 1
+            result$bkg_fraction <= 1
     ))
 
     # p-values should be in [0, 1]
@@ -57,7 +59,8 @@ test_that("calEnrichment ZOOPS produces valid output", {
 
 test_that("calEnrichment ANR produces valid output", {
     result <- calEnrichment(
-        mock_peak_counts, mock_bkg_data, method = "anr"
+        mock_peak_counts, mock_bkg_data,
+        method = "anr"
     )
 
     expect_equal(ncol(result), 10)
@@ -67,10 +70,12 @@ test_that("calEnrichment ANR produces valid output", {
 
 test_that("calEnrichment ZOOPS and ANR give different pvalues", {
     zoops <- calEnrichment(
-        mock_peak_counts, mock_bkg_data, method = "zoops"
+        mock_peak_counts, mock_bkg_data,
+        method = "zoops"
     )
     anr <- calEnrichment(
-        mock_peak_counts, mock_bkg_data, method = "anr"
+        mock_peak_counts, mock_bkg_data,
+        method = "anr"
     )
 
     # Different statistical tests -> different p-values
@@ -83,12 +88,13 @@ test_that("calEnrichment ZOOPS and ANR give different pvalues", {
 
 test_that("calEnrichment ZOOPS phyper matches manual", {
     result <- calEnrichment(
-        mock_peak_counts, mock_bkg_data, method = "zoops"
+        mock_peak_counts, mock_bkg_data,
+        method = "zoops"
     )
 
     # Manual calculation for AAA
     eps <- 1e-4
-    expected_log2fc <- log2((80/200 + eps) / (3000/20000 + eps))
+    expected_log2fc <- log2((80 / 200 + eps) / (3000 / 20000 + eps))
 
     expect_equal(
         result$log2FC[1], expected_log2fc,
@@ -110,11 +116,12 @@ test_that("calEnrichment ZOOPS phyper matches manual", {
 
 test_that("calEnrichment ANR pbinom matches manual", {
     result <- calEnrichment(
-        mock_peak_counts, mock_bkg_data, method = "anr"
+        mock_peak_counts, mock_bkg_data,
+        method = "anr"
     )
 
     eps <- 1e-4
-    expected_log2fc <- log2((100/200 + eps) / (5000/20000 + eps))
+    expected_log2fc <- log2((100 / 200 + eps) / (5000 / 20000 + eps))
 
     expect_equal(
         result$log2FC[1], expected_log2fc,
@@ -136,7 +143,8 @@ test_that("calEnrichment ANR pbinom matches manual", {
 
 test_that("calEnrichment multiplicity is correct", {
     result <- calEnrichment(
-        mock_peak_counts, mock_bkg_data, method = "zoops"
+        mock_peak_counts, mock_bkg_data,
+        method = "zoops"
     )
 
     # AAA: 100 total / 80 sequences with motif = 1.25
@@ -147,20 +155,22 @@ test_that("calEnrichment multiplicity is correct", {
 
 test_that("calEnrichment ZOOPS Score uses fraction difference", {
     result <- calEnrichment(
-        mock_peak_counts, mock_bkg_data, method = "zoops"
+        mock_peak_counts, mock_bkg_data,
+        method = "zoops"
     )
 
     # AAA: target_fraction=80/200=0.4, bkg_fraction=3000/20000=0.15
     # AAT: target_fraction=8/200=0.04, bkg_fraction=800/20000=0.04
     # AAA has highest difference -> should get Score = 1
     # AAT has lowest difference (0) -> should get Score = 0
-    expect_equal(result$Score[1], 1.0)  # AAA
-    expect_equal(result$Score[4], 0.0)  # AAT
+    expect_equal(result$Score[1], 1.0) # AAA
+    expect_equal(result$Score[4], 0.0) # AAT
 })
 
 test_that("calEnrichment ANR Score uses rate difference", {
     result <- calEnrichment(
-        mock_peak_counts, mock_bkg_data, method = "anr"
+        mock_peak_counts, mock_bkg_data,
+        method = "anr"
     )
 
     # AAA: target_rate=100/200=0.5, bkg_rate=5000/20000=0.25

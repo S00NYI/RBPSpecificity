@@ -8,7 +8,7 @@ countKmers(sequences, K, type = "DNA")
 }
 \arguments{
 \item{sequences}{A DNAStringSet object, typically the output from
-\code{\link{getSequence}}.}
+\code{getSequence}.}
 
 \item{K}{Integer, the K-mer size (length of motifs). Must be a single
 positive integer.}

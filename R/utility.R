@@ -660,7 +660,7 @@ getSequence <- function(granges_obj, genome_obj, extension = c(0, 0), min_length
 #'   generated (all K-mers are generated in uppercase).
 #'
 #' @param sequences A DNAStringSet object, typically the output from
-#'   \code{\link{getSequence}}.
+#'   \code{getSequence}.
 #' @param K Integer, the K-mer size (length of motifs). Must be a single
 #'   positive integer.
 #' @param type Character string specifying the nucleic acid type for K-mer

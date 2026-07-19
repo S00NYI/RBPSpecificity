@@ -22,14 +22,14 @@ if (!requireNamespace("pak", quietly = TRUE))
 pak::pkg_install("S00NYI/RBPSpecificity")
 ```
 
-<!-- ### From Bioconductor (After Acceptance)
+### From Bioconductor
 
 ```r
 if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 
 BiocManager::install("RBPSpecificity")
-``` -->
+```
 
 ## Quick Start
 

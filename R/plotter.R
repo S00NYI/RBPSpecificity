@@ -14,7 +14,7 @@
 #'
 #' @return A ggplot object representing the annotated histogram.
 #' @export
-#' @import ggplot2
+#' @importFrom ggplot2 ggplot aes geom_histogram geom_vline annotate labs theme_bw theme element_text
 #'
 #' @examples
 #' # Dummy data
@@ -84,7 +84,7 @@ plotSpecificity <- function(motif_enrichment, motif = NULL, bins = 50, ...) {
 #' @return A ggplot object visualizing the sensitivity matrix (e.g., using points sized
 #' or colored by sensitivity).
 #' @export
-#' @import ggplot2
+#' @importFrom ggplot2 ggplot aes geom_point scale_fill_manual scale_x_continuous scale_y_continuous labs theme_bw theme element_text theme_void
 #' @importFrom reshape2 melt
 #'
 #' @examples

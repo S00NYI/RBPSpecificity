@@ -58,6 +58,22 @@ please refer to:
 > *Inherent Specificity and Mutational Sensitivity as Quantitative Metrics for RBP Binding.* 
 > bioRxiv. https://www.biorxiv.org/content/10.1101/2025.03.28.646018v4
 
+## Workflow Integration
+
+**RBPSpecificity** is designed to seamlessly integrate into standard Bioconductor 
+sequence and genomic analysis workflows:
+
+- **Input Integration**: Raw peak files from CLIP-seq or similar experiments can be 
+  imported as `GRanges` objects using `rtracklayer::import()` and standard annotation 
+  packages (e.g. `GenomicFeatures`).
+- **Sequence Retrieval**: The `motifEnrichment()` function interfaces directly with 
+  `BSgenome` genome packages (e.g., `BSgenome.Hsapiens.UCSC.hg38`) to extract genomic 
+  sequences for enrichment calculations.
+- **Downstream Analysis**: The Specificity and Sensitivity scores and matrices returned 
+  by the package can be integrated with other downstream analyses such as differential 
+  binding studies (e.g., `DiffBind`, `DESeq2`), regulatory network modeling, or motif 
+  annotation pipelines.
+
 ## Sample Data
 
 The sample data included in this package were obtained from the ENCODE portal.
@@ -122,20 +138,20 @@ The package expects a data.frame with `MOTIF` and `Score` columns:
 ```{r calc-rbns-metrics}
 rbps <- c("HNRNPC", "PCBP2", "RBFOX2", "EIF4G2")
 
-rbns_metrics <- list()
-for (rbp in rbps) {
+rbns_metrics <- lapply(rbps, function(rbp) {
     rbns_enrichment <- data.frame(
         MOTIF = rbns_data$Motif,
         Score = rbns_data[[rbp]]
     )
     is_val <- returnSpecificity(rbns_enrichment)
     vs_val <- returnSensitivity(rbns_enrichment, output_type = "number")
-    rbns_metrics[[rbp]] <- list(
+    list(
         enrichment = rbns_enrichment,
         Specificity = is_val,
         Sensitivity = vs_val
     )
-}
+})
+names(rbns_metrics) <- rbps
 
 # Display in vitro metrics
 invitro_summary <- data.frame(
@@ -199,17 +215,17 @@ bed_cols <- c(
 rbp_names <- c("HNRNPC", "PCBP2", "RBFOX2", "EIF4G2")
 cell_lines <- c("K562", "HepG2", "K562", "K562")
 
-peak_data <- list()
-for (i in seq_along(rbp_names)) {
+peak_data <- lapply(seq_along(rbp_names), function(i) {
     bed_file <- system.file("extdata",
         sprintf("ENCODE_eCLIP_%s_%s_narrowPeak.bed", rbp_names[i], cell_lines[i]),
         package = "RBPSpecificity"
     )
     peaks <- read.table(bed_file, header = FALSE, sep = "\t")
     colnames(peaks) <- bed_cols
-    peak_data[[rbp_names[i]]] <- peaks
     message("Loaded ", nrow(peaks), " ", rbp_names[i], " peaks.")
-}
+    peaks
+})
+names(peak_data) <- rbp_names
 ```
 
 ## Running motifEnrichment Pipeline
@@ -237,8 +253,7 @@ nucleotide composition.
 ```{r run-enrichment, eval = requireNamespace("BSgenome.Hsapiens.UCSC.hg38", quietly = TRUE)}
 # NOTE: This requires BSgenome.Hsapiens.UCSC.hg38
 
-cellular_results <- list()
-for (rbp in rbp_names) {
+cellular_results <- lapply(rbp_names, function(rbp) {
     message("Running motifEnrichment for ", rbp, "...")
     enrichment <- motifEnrichment(
         coordinates = peak_data[[rbp]],
@@ -253,12 +268,13 @@ for (rbp in rbp_names) {
     cs_val <- returnSpecificity(enrichment)
     cvs_val <- returnSensitivity(enrichment, output_type = "number")
 
-    cellular_results[[rbp]] <- list(
+    list(
         enrichment = enrichment,
         Specificity = cs_val,
         Sensitivity = cvs_val
     )
-}
+})
+names(cellular_results) <- rbp_names
 
 # Display cellular metrics
 cellular_summary <- data.frame(

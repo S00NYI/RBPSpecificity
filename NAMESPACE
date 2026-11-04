@@ -6,56 +6,76 @@ export(plotSpecificity)
 export(returnSensitivity)
 export(returnSpecificity)
 importFrom(BSgenome,getBSgenome)
-importFrom(Biostrings,BString)
-importFrom(Biostrings,DNAString)
-importFrom(Biostrings,DNAStringSet)
-importFrom(Biostrings,PDict)
-importFrom(Biostrings,getSeq)
-importFrom(Biostrings,vcountPDict)
-importFrom(Biostrings,width)
-importFrom(GenomeInfoDb,"seqlengths<-")
-importFrom(GenomeInfoDb,keepSeqlevels)
-importFrom(GenomeInfoDb,seqlengths)
-importFrom(GenomeInfoDb,seqlevels)
-importFrom(GenomeInfoDb,seqlevelsInUse)
-importFrom(GenomeInfoDb,seqnames)
-importFrom(GenomicRanges,"end<-")
-importFrom(GenomicRanges,"start<-")
-importFrom(GenomicRanges,GRanges)
-importFrom(GenomicRanges,end)
-importFrom(GenomicRanges,findOverlaps)
-importFrom(GenomicRanges,makeGRangesFromDataFrame)
-importFrom(GenomicRanges,seqnames)
-importFrom(GenomicRanges,shift)
-importFrom(GenomicRanges,start)
-importFrom(GenomicRanges,strand)
-importFrom(GenomicRanges,trim)
-importFrom(GenomicRanges,width)
-importFrom(S4Vectors,"mcols<-")
-importFrom(S4Vectors,elementNROWS)
-importFrom(S4Vectors,mcols)
-importFrom(S4Vectors,queryHits)
-importFrom(ggplot2,aes)
-importFrom(ggplot2,annotate)
-importFrom(ggplot2,element_text)
-importFrom(ggplot2,geom_histogram)
-importFrom(ggplot2,geom_point)
-importFrom(ggplot2,geom_vline)
-importFrom(ggplot2,ggplot)
-importFrom(ggplot2,labs)
-importFrom(ggplot2,scale_fill_manual)
-importFrom(ggplot2,scale_x_continuous)
-importFrom(ggplot2,scale_y_continuous)
-importFrom(ggplot2,theme)
-importFrom(ggplot2,theme_bw)
-importFrom(ggplot2,theme_void)
+importFrom(Biostrings,
+  BString,
+  DNAString,
+  DNAStringSet,
+  PDict,
+  getSeq,
+  vcountPDict,
+  width
+)
+importFrom(GenomeInfoDb,
+  "seqlengths<-",
+  keepSeqlevels,
+  mapSeqlevels,
+  seqlengths,
+  seqlevels,
+  seqlevelsInUse,
+  seqlevelsStyle,
+  seqnames,
+  standardChromosomes
+)
+importFrom(GenomicRanges,
+  "end<-",
+  "start<-",
+  GRanges,
+  end,
+  findOverlaps,
+  makeGRangesFromDataFrame,
+  ranges,
+  seqnames,
+  shift,
+  start,
+  strand,
+  trim,
+  width
+)
+importFrom(S4Vectors,
+  "mcols<-",
+  "metadata<-",
+  elementNROWS,
+  mcols,
+  metadata,
+  queryHits
+)
+importFrom(ggplot2,
+  aes,
+  annotate,
+  element_text,
+  geom_histogram,
+  geom_point,
+  geom_vline,
+  ggplot,
+  labs,
+  scale_fill_manual,
+  scale_x_continuous,
+  scale_y_continuous,
+  theme,
+  theme_bw,
+  theme_void
+)
 importFrom(methods,is)
 importFrom(reshape2,melt)
-importFrom(stats,median)
-importFrom(stats,p.adjust)
-importFrom(stats,pbinom)
-importFrom(stats,phyper)
-importFrom(stats,runif)
-importFrom(stats,sd)
-importFrom(utils,setTxtProgressBar)
-importFrom(utils,txtProgressBar)
+importFrom(stats,
+  median,
+  p.adjust,
+  pbinom,
+  phyper,
+  runif,
+  sd
+)
+importFrom(utils,
+  setTxtProgressBar,
+  txtProgressBar
+)

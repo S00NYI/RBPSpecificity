@@ -7,14 +7,17 @@
 selectGenome(species_or_build)
 }
 \arguments{
-\item{species_or_build}{Character string (e.g., "hg38", "mm10", "mm39").
-Currently supports hg19, hg38, mm9, mm10, mm39.}
+\item{species_or_build}{A BSgenome object or a single character string.}
 }
 \value{
 A BSgenome object.
 }
 \description{
-Loads the appropriate BSgenome package based on a species or
-build identifier. Checks if the package is installed.
+Returns a BSgenome object from one of three kinds of input:
+  a BSgenome object (returned as is), a short identifier with a built-in
+  shortcut (e.g. "hg38", "human", "grcm39"), or any other installed genome,
+  given by build name (e.g. "danRer11") or full package name
+  (e.g. "BSgenome.Drerio.UCSC.danRer11"). The last case uses
+  \code{BSgenome::getBSgenome()}.
 }
 \keyword{internal}

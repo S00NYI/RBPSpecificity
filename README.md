@@ -66,7 +66,7 @@ plotSensitivity(enrichment)
 ### `motifEnrichment`
 Main workflow function to calculate K-mer enrichment.
 - **coordinates**: data frame or GRanges containing genomic coordinates.
-- **species_or_build**: text string for genome build (e.g. "hg38").
+- **species_or_build**: a BSgenome object, or the name of an installed genome: a shortcut ("hg19", "hg38", "mm9", "mm10", "mm39"), a BSgenome build (e.g. "danRer11"), or a BSgenome package name (e.g. "BSgenome.Drerio.UCSC.danRer11").
 - **K**: integer K-mer length (e.g. 5).
 - **extension**: numeric vector `c(five_prime, three_prime)` indicating shifting of 5' and 3' ends. Positive extends, negative trims (default: `c(0,0)`).
 - **method**: enrichment model: "anr" (default, any number of repetitions, conditional Binomial test) or "zoops" (zero-or-one occurrence per sequence, Hypergeometric test).
@@ -75,6 +75,7 @@ Main workflow function to calculate K-mer enrichment.
 - **bkg_max_dist**: max shift distance for background (default: 1000).
 - **scramble_bkg**: logical, scramble background sequences to control for nucleotide composition (default: FALSE).
 - **nucleic_acid_type**: "DNA" or "RNA" (default: "DNA").
+- **chromosomes**: "standard" (default), "all" (also keep scaffolds and unplaced contigs), or a vector of chromosome names, e.g. `c("chr1", "chrX")`. Peak chromosome names are matched to the genome's naming style (e.g. "1" to "chr1"), and a table of how many peaks each filtering step removed is printed and stored in `attr(result, "filter_summary")`.
 
 ### `returnSpecificity`
 Calculate Specificity.

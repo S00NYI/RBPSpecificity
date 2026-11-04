@@ -14,14 +14,18 @@ motifEnrichment(
   bkg_min_dist = 500,
   bkg_max_dist = 1000,
   scramble_bkg = FALSE,
-  nucleic_acid_type = "DNA"
+  nucleic_acid_type = "DNA",
+  chromosomes = "standard"
 )
 }
 \arguments{
 \item{coordinates}{A data frame or GRanges object with genomic
 coordinates. Data frames need chr, start, end columns.}
 
-\item{species_or_build}{Character, genome build (e.g. "hg38").}
+\item{species_or_build}{A BSgenome object, or a character string naming
+an installed genome: a shortcut such as \code{"hg38"} or \code{"mm39"},
+a BSgenome build such as \code{"danRer11"}, or a BSgenome package name.
+See Details.}
 
 \item{K}{Integer, K-mer length (e.g. 5).}
 
@@ -43,6 +47,14 @@ to control for nucleotide composition. Default: FALSE.}
 
 \item{nucleic_acid_type}{Character, "DNA" or "RNA".
 Default: "DNA".}
+
+\item{chromosomes}{Which chromosomes to analyze: \code{"standard"}
+(default) for the genome's standard chromosomes (e.g. chr1-22, X, Y and
+M for hg38), \code{"all"} to also keep scaffolds and unplaced contigs,
+or a character vector of chromosome names, e.g.
+\code{c("chr1", "chrX")}. Names in either UCSC or Ensembl style are
+accepted. If the genome's organism has no standard chromosome list,
+\code{"standard"} uses all chromosomes.}
 }
 \value{
 A data frame with 10 columns:
@@ -62,6 +74,9 @@ A data frame with 10 columns:
     \item{multiplicity}{Average occurrences per containing
       sequence.}
   }
+  The attribute \code{"filter_summary"} holds a data frame with one row
+  per filtering step and columns \code{step}, \code{removed},
+  \code{remaining} and \code{details} (chromosomes affected).
 }
 \description{
 Main workflow function for RBPSpecificity. Processes RBP
@@ -71,8 +86,10 @@ ZOOPS (per-sequence presence) statistical models.
 }
 \details{
 The workflow proceeds as follows:
-1. Parses input coordinates into a GRanges object.
-2. Loads the specified BSgenome for sequence retrieval.
+1. Loads the specified BSgenome for sequence retrieval.
+2. Parses input coordinates into a GRanges object, matches chromosome
+   names to the genome (e.g. "1" to "chr1"), and keeps peaks on the
+   selected chromosomes.
 3. Extracts peak sequences with optional extension/trimming.
 4. Counts K-mers (both total and per-sequence presence).
 5. Generates background K-mer profiles from shifted regions.
@@ -91,6 +108,24 @@ Two statistical models are available via the \code{method} parameter:
 }
 ANR is sensitive to motif multiplicity and cooperative binding hotspots,
 whereas ZOOPS is robust to repetitive elements and compositional noise.
+
+\bold{Genomes:}
+\code{species_or_build} accepts a BSgenome object, so any organism with a
+BSgenome package (including one built with
+\code{BSgenome::forgeBSgenomeDataPkg()}) can be used. It also accepts
+the name of any installed BSgenome build or package, such as
+\code{"danRer11"} or \code{"BSgenome.Drerio.UCSC.danRer11"}. Shortcuts
+are provided for human and mouse builds: \code{"hg19"}/\code{"grch37"},
+\code{"hg38"}/\code{"grch38"}/\code{"human"}, \code{"mm9"},
+\code{"mm10"}/\code{"grcm38"} and \code{"mm39"}/\code{"grcm39"}.
+
+\bold{Peak filtering:}
+Peaks whose chromosome names use a different style than the genome
+(e.g. Ensembl "1" and "MT" vs. UCSC "chr1" and "chrM") are renamed to
+match. Peaks on chromosomes that are not in the genome are removed, and
+only peaks on the chromosomes chosen with \code{chromosomes} are kept.
+A table of how many peaks each step removed is printed, and is also
+attached to the result as \code{attr(result, "filter_summary")}.
 }
 \examples{
 if (requireNamespace("BSgenome.Hsapiens.UCSC.hg38", quietly = TRUE)) {
@@ -110,5 +145,15 @@ if (requireNamespace("BSgenome.Hsapiens.UCSC.hg38", quietly = TRUE)) {
         method = "anr", bkg_iter = 5
     )
     head(result)
+
+    # Peaks removed at each filtering step
+    attr(result, "filter_summary")
+
+    # A BSgenome object can be passed directly, and chromosomes chosen
+    hg38 <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
+    result_chr1 <- motifEnrichment(peaks, hg38,
+        K = 5,
+        bkg_iter = 5, chromosomes = c("chr1", "chr2")
+    )
 }
 }

@@ -68,7 +68,8 @@ sequence and genomic analysis workflows:
   packages (e.g. `GenomicFeatures`).
 - **Sequence Retrieval**: The `motifEnrichment()` function interfaces directly with 
   `BSgenome` genome packages (e.g., `BSgenome.Hsapiens.UCSC.hg38`) to extract genomic 
-  sequences for enrichment calculations.
+  sequences for enrichment calculations. Any organism with a BSgenome package can be 
+  used by passing the `BSgenome` object or its build name.
 - **Downstream Analysis**: The Specificity and Sensitivity scores and matrices returned 
   by the package can be integrated with other downstream analyses such as differential 
   binding studies (e.g., `DiffBind`, `DESeq2`), regulatory network modeling, or motif 
@@ -242,6 +243,7 @@ parameters for customization:
 | `bkg_max_dist` | Maximum distance (bp) for shifting peaks in background generation |
 | `scramble_bkg` | Logical, scramble background sequences to control for nucleotide composition (default: FALSE) |
 | `nucleic_acid_type`| Character string, `"DNA"` or `"RNA"` (default: `"DNA"`) |
+| `chromosomes` | `"standard"` (default) for the genome's standard chromosomes, `"all"` to also keep scaffolds and unplaced contigs, or a vector of chromosome names such as `c("chr1", "chrX")` |
 
 ZOOPS method can also be used instead. Note that ANR and ZOOPS calculation can 
 result in different motif enrichment values and thus different specificity and 
@@ -283,6 +285,41 @@ cellular_summary <- data.frame(
     Sensitivity = sapply(cellular_results, function(x) round(x$Sensitivity, 4))
 )
 print(cellular_summary)
+```
+
+### Peak Filtering Summary
+
+Before counting K-mers, `motifEnrichment()` matches peak chromosome names to
+the genome (for example, Ensembl-style `"1"` and `"MT"` become `"chr1"` and
+`"chrM"` for a UCSC genome). It then removes peaks on chromosomes that are not
+in the genome or not selected with `chromosomes`, and peaks that become too
+short after extension. A table of these steps is printed during the run and
+attached to the result:
+
+```{r filter-summary, eval = requireNamespace("BSgenome.Hsapiens.UCSC.hg38", quietly = TRUE)}
+attr(cellular_results[[1]]$enrichment, "filter_summary")
+```
+
+### Using Other Genomes
+
+`species_or_build` accepts a `BSgenome` object, so any organism with a
+BSgenome package can be used, including custom genomes built with
+`BSgenome::forgeBSgenomeDataPkg()`. The name of any installed BSgenome build or
+package also works. Shortcuts are provided for common human and mouse builds
+(`"hg19"`, `"hg38"`, `"mm9"`, `"mm10"`, `"mm39"`).
+
+```{r other-genomes, eval = FALSE}
+# A BSgenome object
+library(BSgenome.Drerio.UCSC.danRer11)
+enrichment <- motifEnrichment(peaks, BSgenome.Drerio.UCSC.danRer11, K = 5)
+
+# An installed build or package name
+enrichment <- motifEnrichment(peaks, "danRer11", K = 5)
+enrichment <- motifEnrichment(peaks, "BSgenome.Drerio.UCSC.danRer11", K = 5)
+
+# Only some chromosomes
+enrichment <- motifEnrichment(peaks, "hg38", K = 5,
+                              chromosomes = c("chr1", "chr2"))
 ```
 
 ## Visualization

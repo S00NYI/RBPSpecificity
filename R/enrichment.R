@@ -311,8 +311,10 @@ calEnrichment <- function(peak_counts_df, bkg_data,
 #'
 #' @details
 #' The workflow proceeds as follows:
-#' 1. Parses input coordinates into a GRanges object.
-#' 2. Loads the specified BSgenome for sequence retrieval.
+#' 1. Loads the specified BSgenome for sequence retrieval.
+#' 2. Parses input coordinates into a GRanges object, matches chromosome
+#'    names to the genome (e.g. "1" to "chr1"), and keeps peaks on the
+#'    selected chromosomes.
 #' 3. Extracts peak sequences with optional extension/trimming.
 #' 4. Counts K-mers (both total and per-sequence presence).
 #' 5. Generates background K-mer profiles from shifted regions.
@@ -332,9 +334,30 @@ calEnrichment <- function(peak_counts_df, bkg_data,
 #' ANR is sensitive to motif multiplicity and cooperative binding hotspots,
 #' whereas ZOOPS is robust to repetitive elements and compositional noise.
 #'
+#' \bold{Genomes:}
+#' \code{species_or_build} accepts a BSgenome object, so any organism with a
+#' BSgenome package (including one built with
+#' \code{BSgenome::forgeBSgenomeDataPkg()}) can be used. It also accepts
+#' the name of any installed BSgenome build or package, such as
+#' \code{"danRer11"} or \code{"BSgenome.Drerio.UCSC.danRer11"}. Shortcuts
+#' are provided for human and mouse builds: \code{"hg19"}/\code{"grch37"},
+#' \code{"hg38"}/\code{"grch38"}/\code{"human"}, \code{"mm9"},
+#' \code{"mm10"}/\code{"grcm38"} and \code{"mm39"}/\code{"grcm39"}.
+#'
+#' \bold{Peak filtering:}
+#' Peaks whose chromosome names use a different style than the genome
+#' (e.g. Ensembl "1" and "MT" vs. UCSC "chr1" and "chrM") are renamed to
+#' match. Peaks on chromosomes that are not in the genome are removed, and
+#' only peaks on the chromosomes chosen with \code{chromosomes} are kept.
+#' A table of how many peaks each step removed is printed, and is also
+#' attached to the result as \code{attr(result, "filter_summary")}.
+#'
 #' @param coordinates A data frame or GRanges object with genomic
 #'   coordinates. Data frames need chr, start, end columns.
-#' @param species_or_build Character, genome build (e.g. "hg38").
+#' @param species_or_build A BSgenome object, or a character string naming
+#'   an installed genome: a shortcut such as \code{"hg38"} or \code{"mm39"},
+#'   a BSgenome build such as \code{"danRer11"}, or a BSgenome package name.
+#'   See Details.
 #' @param K Integer, K-mer length (e.g. 5).
 #' @param extension Numeric vector of length 2:
 #'   c(five_prime, three_prime). Positive extends, negative trims.
@@ -348,6 +371,13 @@ calEnrichment <- function(peak_counts_df, bkg_data,
 #'   to control for nucleotide composition. Default: FALSE.
 #' @param nucleic_acid_type Character, "DNA" or "RNA".
 #'   Default: "DNA".
+#' @param chromosomes Which chromosomes to analyze: \code{"standard"}
+#'   (default) for the genome's standard chromosomes (e.g. chr1-22, X, Y and
+#'   M for hg38), \code{"all"} to also keep scaffolds and unplaced contigs,
+#'   or a character vector of chromosome names, e.g.
+#'   \code{c("chr1", "chrX")}. Names in either UCSC or Ensembl style are
+#'   accepted. If the genome's organism has no standard chromosome list,
+#'   \code{"standard"} uses all chromosomes.
 #'
 #' @return A data frame with 10 columns:
 #'   \describe{
@@ -366,6 +396,9 @@ calEnrichment <- function(peak_counts_df, bkg_data,
 #'     \item{multiplicity}{Average occurrences per containing
 #'       sequence.}
 #'   }
+#'   The attribute \code{"filter_summary"} holds a data frame with one row
+#'   per filtering step and columns \code{step}, \code{removed},
+#'   \code{remaining} and \code{details} (chromosomes affected).
 #' @export
 #'
 #' @examples
@@ -386,6 +419,16 @@ calEnrichment <- function(peak_counts_df, bkg_data,
 #'         method = "anr", bkg_iter = 5
 #'     )
 #'     head(result)
+#'
+#'     # Peaks removed at each filtering step
+#'     attr(result, "filter_summary")
+#'
+#'     # A BSgenome object can be passed directly, and chromosomes chosen
+#'     hg38 <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
+#'     result_chr1 <- motifEnrichment(peaks, hg38,
+#'         K = 5,
+#'         bkg_iter = 5, chromosomes = c("chr1", "chr2")
+#'     )
 #' }
 motifEnrichment <- function(coordinates,
                             species_or_build,
@@ -396,7 +439,8 @@ motifEnrichment <- function(coordinates,
                             bkg_min_dist = 500,
                             bkg_max_dist = 1000,
                             scramble_bkg = FALSE,
-                            nucleic_acid_type = "DNA") {
+                            nucleic_acid_type = "DNA",
+                            chromosomes = "standard") {
     # --- 1. Input Validation ---
     message("--- Phase 1: Validating Inputs ---")
     if (missing(coordinates) ||
@@ -420,14 +464,26 @@ motifEnrichment <- function(coordinates,
 
     # Load genome
     genome_obj <- selectGenome(species_or_build)
-    message("Loaded genome: ", species_or_build)
+    genome_name <- genomeLabel(genome_obj)
+    message("Loaded genome: ", genome_name)
 
-    # Parse coordinates
-    peak_gr <- peakParse(input = coordinates)
+    # Parse coordinates, then match them to the genome's chromosomes
+    peak_gr <- peakParse(input = coordinates, standard_chroms_only = FALSE)
     if (length(peak_gr) == 0) {
         stop("No coordinates after parsing.")
     }
-    message("Parsed ", length(peak_gr), " coordinates.")
+    chrom_filter <- filterPeakChromosomes(peak_gr, genome_obj, chromosomes)
+    peak_gr <- chrom_filter$gr
+    filter_summary <- chrom_filter$summary
+    summary_title <- paste0(
+        "Peak filtering summary (genome: ", genome_name,
+        "; chromosomes: ",
+        if (length(chromosomes) == 1) chromosomes else shortList(chromosomes),
+        ")"
+    )
+    if (length(peak_gr) == 0) {
+        stopNoPeaks(filter_summary, genome_obj, summary_title)
+    }
 
     # --- 2. Peak Sequence Processing ---
     message("\n--- Phase 2: Processing Peak Sequences ---")
@@ -435,18 +491,22 @@ motifEnrichment <- function(coordinates,
         granges_obj = peak_gr,
         genome_obj = genome_obj,
         extension = extension,
-        min_length = K
+        min_length = K,
+        verbose = FALSE
+    )
+    seq_counts <- S4Vectors::metadata(peak_sequences)$filter_counts
+    filter_summary <- addFilterStep(
+        filter_summary, "Too short after extension",
+        seq_counts[["too_short_after_extension"]]
+    )
+    filter_summary <- addFilterStep(
+        filter_summary, "Too short at chromosome end",
+        seq_counts[["too_short_at_chrom_end"]]
     )
     if (length(peak_sequences) == 0) {
-        stop(
-            "No sequences retrieved. ",
-            "Check coordinates and chromosome names."
-        )
+        stopNoPeaks(filter_summary, genome_obj, summary_title)
     }
-    message(
-        "Retrieved ", length(peak_sequences),
-        " sequences."
-    )
+    message(formatFilterSummary(filter_summary, summary_title))
 
     peak_kmer_counts <- countKmers(
         sequences = peak_sequences,
@@ -493,6 +553,7 @@ motifEnrichment <- function(coordinates,
         method, "' method."
     )
 
+    attr(results, "filter_summary") <- filter_summary
     message("\n--- Workflow Complete ---")
     return(results)
 }

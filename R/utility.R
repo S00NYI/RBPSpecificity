@@ -305,21 +305,33 @@ valInputMotif <- function(motif, kmer_size, available_motifs) {
 
 #' Select and Load BSgenome Object
 #'
-#' @description Loads the appropriate BSgenome package based on a species or
-#' build identifier. Checks if the package is installed.
+#' @description Returns a BSgenome object from one of three kinds of input:
+#'   a BSgenome object (returned as is), a short identifier with a built-in
+#'   shortcut (e.g. "hg38", "human", "grcm39"), or any other installed genome,
+#'   given by build name (e.g. "danRer11") or full package name
+#'   (e.g. "BSgenome.Drerio.UCSC.danRer11"). The last case uses
+#'   \code{BSgenome::getBSgenome()}.
 #'
-#' @param species_or_build Character string (e.g., "hg38", "mm10", "mm39").
-#'   Currently supports hg19, hg38, mm9, mm10, mm39.
+#' @param species_or_build A BSgenome object or a single character string.
 #'
 #' @return A BSgenome object.
 #' @importFrom BSgenome getBSgenome
 #' @importFrom methods is
 #' @keywords internal
 selectGenome <- function(species_or_build) {
-    # Normalize input to lower case
-    lookup <- tolower(species_or_build)
+    if (methods::is(species_or_build, "BSgenome")) {
+        return(species_or_build)
+    }
+    if (!is.character(species_or_build) || length(species_or_build) != 1 ||
+        is.na(species_or_build) || !nzchar(species_or_build)) {
+        stop(
+            "'species_or_build' must be a BSgenome object or a single ",
+            "character string (e.g. \"hg38\", \"danRer11\", or ",
+            "\"BSgenome.Drerio.UCSC.danRer11\")."
+        )
+    }
 
-    # Simple mapping (extend this as needed)
+    # Shortcuts for common builds and aliases
     genome_map <- list(
         "hg19" = "BSgenome.Hsapiens.UCSC.hg19",
         "grch37" = "BSgenome.Hsapiens.UCSC.hg19",
@@ -331,32 +343,56 @@ selectGenome <- function(species_or_build) {
         "grcm38" = "BSgenome.Mmusculus.UCSC.mm10",
         "mm39" = "BSgenome.Mmusculus.UCSC.mm39",
         "grcm39" = "BSgenome.Mmusculus.UCSC.mm39"
-        # Add more mappings here if needed
     )
+    pkg_name <- genome_map[[tolower(species_or_build)]]
 
-    pkg_name <- genome_map[[lookup]]
-
-    if (is.null(pkg_name)) {
-        stop(
-            "Unknown species or build identifier: '", species_or_build,
-            "'. Supported identifiers include: ", paste(names(genome_map), collapse = ", ")
-        )
+    if (!is.null(pkg_name)) {
+        if (!requireNamespace(pkg_name, quietly = TRUE)) {
+            stop(
+                "The required genome package '", pkg_name, "' is not installed.\n",
+                "Please install it using BiocManager, e.g.:\n",
+                "if (!requireNamespace(\"BiocManager\", quietly = TRUE))\n",
+                "    install.packages(\"BiocManager\")\n",
+                "BiocManager::install(\"", pkg_name, "\")"
+            )
+        }
+        return(BSgenome::getBSgenome(pkg_name))
     }
 
-    # Check if the package is installed
-    if (!requireNamespace(pkg_name, quietly = TRUE)) {
-        stop(
-            "The required genome package '", pkg_name, "' is not installed.\n",
-            "Please install it using BiocManager, e.g.:\n",
-            "if (!requireNamespace(\"BiocManager\", quietly = TRUE))\n",
-            "    install.packages(\"BiocManager\")\n",
-            "BiocManager::install(\"", pkg_name, "\")"
+    # Any other installed BSgenome, by build or package name
+    tryCatch(
+        BSgenome::getBSgenome(species_or_build),
+        error = function(e) {
+            stop(
+                "Could not load a genome for '", species_or_build, "'.\n",
+                conditionMessage(e), "\n",
+                "Pass a BSgenome object, an installed BSgenome build or ",
+                "package name (see BSgenome::available.genomes()), or one ",
+                "of: ", paste(names(genome_map), collapse = ", "), ".",
+                call. = FALSE
+            )
+        }
+    )
+}
+
+
+#' Get a Short Label for a BSgenome Object
+#'
+#' @param genome_obj A BSgenome object.
+#' @return Character string such as "hg38", or the organism name if no
+#'   build is recorded.
+#' @importFrom S4Vectors metadata metadata<-
+#' @keywords internal
+genomeLabel <- function(genome_obj) {
+    label <- tryCatch(S4Vectors::metadata(genome_obj)$genome,
+        error = function(e) NULL
+    )
+    if (is.null(label) || length(label) != 1 || is.na(label) || !nzchar(label)) {
+        label <- tryCatch(BSgenome::organism(genome_obj),
+            error = function(e) "custom genome"
         )
     }
-
-    # Load and return the genome object
-    genome <- BSgenome::getBSgenome(pkg_name)
-    return(genome)
+    as.character(label)
 }
 
 
@@ -471,6 +507,298 @@ peakParse <- function(input, standard_chroms_only = TRUE, keep_extra = TRUE) {
 
     # message("peakParse returning GRanges object with ", length(initial_gr), " ranges.")
     return(initial_gr)
+}
+
+
+#' Map Chromosome Names to a Genome's Names
+#'
+#' @description For each name in \code{x}, finds the matching chromosome
+#'   name in \code{genome_obj}. Tries an exact match, then the genome's
+#'   naming style via \code{GenomeInfoDb::mapSeqlevels()} (e.g. "MT" to
+#'   "chrM"), then adding or removing a "chr" prefix.
+#'
+#' @param x Character vector of chromosome names.
+#' @param genome_obj A BSgenome object.
+#' @return Character vector the same length as \code{x}, with the matching
+#'   genome chromosome name, or NA where none was found.
+#' @importFrom GenomeInfoDb seqlevels seqlevelsStyle mapSeqlevels
+#' @keywords internal
+mapToGenomeSeqlevels <- function(x, genome_obj) {
+    x <- as.character(x)
+    genome_sl <- GenomeInfoDb::seqlevels(genome_obj)
+    out <- ifelse(x %in% genome_sl, x, NA_character_)
+
+    todo <- is.na(out)
+    if (any(todo)) {
+        style <- tryCatch(GenomeInfoDb::seqlevelsStyle(genome_obj)[1],
+            error = function(e) NA_character_
+        )
+        if (!is.na(style)) {
+            mapped <- tryCatch(
+                unname(suppressWarnings(
+                    GenomeInfoDb::mapSeqlevels(x[todo], style)
+                )),
+                error = function(e) rep(NA_character_, sum(todo))
+            )
+            # mapSeqlevels() can return a shorter vector when nothing maps
+            if (length(mapped) != sum(todo)) {
+                mapped <- rep(NA_character_, sum(todo))
+            }
+            mapped[!(mapped %in% genome_sl)] <- NA_character_
+            out[todo] <- mapped
+        }
+    }
+
+    todo <- is.na(out)
+    if (any(todo)) {
+        alt <- ifelse(startsWith(x[todo], "chr"),
+            sub("^chr", "", x[todo]), paste0("chr", x[todo])
+        )
+        alt[!(alt %in% genome_sl)] <- NA_character_
+        out[todo] <- alt
+    }
+    unname(out)
+}
+
+
+#' Resolve the Chromosomes to Analyze
+#'
+#' @param chromosomes "standard", "all", or a character vector of
+#'   chromosome names.
+#' @param genome_obj A BSgenome object.
+#' @return Character vector of genome chromosome names to keep.
+#' @importFrom GenomeInfoDb seqlevels standardChromosomes
+#' @keywords internal
+resolveChromosomes <- function(chromosomes, genome_obj) {
+    if (!is.character(chromosomes) || length(chromosomes) == 0 ||
+        anyNA(chromosomes) || !all(nzchar(chromosomes))) {
+        stop(
+            "'chromosomes' must be \"standard\", \"all\", or a character ",
+            "vector of chromosome names."
+        )
+    }
+    genome_sl <- GenomeInfoDb::seqlevels(genome_obj)
+    keyword <- if (length(chromosomes) == 1) tolower(chromosomes) else ""
+
+    if (keyword == "all") {
+        return(genome_sl)
+    }
+    if (keyword == "standard") {
+        std <- tryCatch(GenomeInfoDb::standardChromosomes(genome_obj),
+            error = function(e) character(0)
+        )
+        std <- intersect(std, genome_sl)
+        if (length(std) == 0) {
+            message(
+                "Standard chromosomes are not defined for genome '",
+                genomeLabel(genome_obj), "'. Using all of its chromosomes."
+            )
+            return(genome_sl)
+        }
+        return(std)
+    }
+
+    mapped <- mapToGenomeSeqlevels(chromosomes, genome_obj)
+    not_found <- chromosomes[is.na(mapped)]
+    if (length(not_found) == length(chromosomes)) {
+        stop(
+            "None of the requested chromosomes were found in genome '",
+            genomeLabel(genome_obj), "': ", shortList(not_found), ".\n",
+            "Genome chromosomes look like: ", shortList(genome_sl), "."
+        )
+    }
+    if (length(not_found) > 0) {
+        warning(
+            "Chromosomes not found in genome '", genomeLabel(genome_obj),
+            "' and ignored: ", shortList(not_found), ".",
+            call. = FALSE
+        )
+    }
+    unique(mapped[!is.na(mapped)])
+}
+
+
+#' Shorten a Character Vector for Display
+#'
+#' @param x Character vector.
+#' @param n Number of items to show before summarizing the rest.
+#' @return A single string, e.g. "chr1, chr2, chr3 (+5 more)".
+#' @keywords internal
+shortList <- function(x, n = 3) {
+    x <- unique(as.character(x))
+    if (length(x) == 0) {
+        return("")
+    }
+    shown <- paste(utils::head(x, n), collapse = ", ")
+    if (length(x) > n) {
+        shown <- paste0(shown, " (+", length(x) - n, " more)")
+    }
+    shown
+}
+
+
+#' Match Peaks to the Genome and Select Chromosomes
+#'
+#' @description Renames peak chromosomes to the genome's naming style where
+#'   needed (e.g. "1" to "chr1"), removes peaks on chromosomes that are not
+#'   in the genome, and keeps only peaks on the selected chromosomes.
+#'
+#' @param peak_gr A GRanges object of peaks.
+#' @param genome_obj A BSgenome object.
+#' @param chromosomes "standard" (default), "all", or a character vector of
+#'   chromosome names.
+#'
+#' @return A list with \code{gr}, the filtered GRanges, and \code{summary},
+#'   a data frame with columns \code{step}, \code{removed},
+#'   \code{remaining} and \code{details}.
+#' @importFrom GenomicRanges GRanges seqnames strand ranges
+#' @importFrom S4Vectors mcols mcols<-
+#' @keywords internal
+filterPeakChromosomes <- function(peak_gr, genome_obj, chromosomes = "standard") {
+    selected <- resolveChromosomes(chromosomes, genome_obj)
+    n_input <- length(peak_gr)
+
+    chr <- as.character(GenomicRanges::seqnames(peak_gr))
+    levels_in_use <- unique(chr)
+    mapped_levels <- mapToGenomeSeqlevels(levels_in_use, genome_obj)
+    new_chr <- mapped_levels[match(chr, levels_in_use)]
+
+    renamed <- !is.na(mapped_levels) & mapped_levels != levels_in_use
+    rename_pairs <- if (any(renamed)) {
+        paste0(levels_in_use[renamed], " -> ", mapped_levels[renamed])
+    } else {
+        character(0)
+    }
+
+    in_genome <- !is.na(new_chr)
+    in_selection <- in_genome & new_chr %in% selected
+
+    keep <- which(in_selection)
+    out <- GenomicRanges::GRanges(
+        seqnames = new_chr[keep],
+        ranges = GenomicRanges::ranges(peak_gr)[keep],
+        strand = GenomicRanges::strand(peak_gr)[keep]
+    )
+    S4Vectors::mcols(out) <- S4Vectors::mcols(peak_gr)[keep, , drop = FALSE]
+    names(out) <- names(peak_gr)[keep]
+
+    n_genome <- sum(in_genome)
+    n_selected <- length(keep)
+    summary <- data.frame(
+        step = c(
+            "Input peaks",
+            "Chromosome names matched to genome",
+            "Chromosome not in genome",
+            "Outside selected chromosomes"
+        ),
+        removed = c(NA_integer_, NA_integer_, n_input - n_genome, n_genome - n_selected),
+        remaining = c(n_input, n_input, n_genome, n_selected),
+        details = c(
+            "",
+            paste(rename_pairs, collapse = ", "),
+            paste(unique(chr[!in_genome]), collapse = ", "),
+            paste(unique(new_chr[in_genome & !in_selection]), collapse = ", ")
+        ),
+        stringsAsFactors = FALSE
+    )
+    list(gr = out, summary = summary)
+}
+
+
+#' Add a Step to the Peak Filtering Summary
+#'
+#' @param summary Data frame from \code{filterPeakChromosomes()}.
+#' @param step Character, step label.
+#' @param removed Integer, number of peaks removed at this step.
+#' @param details Character, extra information (comma-separated names).
+#' @return The data frame with one row added.
+#' @keywords internal
+addFilterStep <- function(summary, step, removed, details = "") {
+    remaining <- summary$remaining[nrow(summary)] - removed
+    rbind(summary, data.frame(
+        step = step, removed = as.integer(removed),
+        remaining = as.integer(remaining), details = details,
+        stringsAsFactors = FALSE
+    ))
+}
+
+
+#' Stop With a Helpful Message When No Peaks Remain
+#'
+#' @param summary Peak filtering summary data frame.
+#' @param genome_obj A BSgenome object.
+#' @param title Character, heading for the summary table.
+#' @keywords internal
+stopNoPeaks <- function(summary, genome_obj, title) {
+    removed <- summary$removed
+    removed[is.na(removed)] <- 0L
+    worst <- summary$step[which.max(removed)]
+    hint <- switch(worst,
+        "Chromosome not in genome" = paste0(
+            "Peak chromosome names do not match genome '", genomeLabel(genome_obj),
+            "'. Peaks use: ", shortList(strsplit(
+                summary$details[summary$step == worst], ", ", fixed = TRUE
+            )[[1]]), "; the genome uses: ",
+            shortList(GenomeInfoDb::seqlevels(genome_obj)), ". ",
+            "Check that the peaks and genome are from the same build."
+        ),
+        "Outside selected chromosomes" = paste0(
+            "No peaks are on the selected chromosomes. Check the ",
+            "'chromosomes' argument, or use chromosomes = \"all\"."
+        ),
+        paste0(
+            "Peaks are too short for K after extension or trimming. ",
+            "Check 'extension' and 'K'."
+        )
+    )
+    stop("No peaks remaining after filtering.\n",
+        formatFilterSummary(summary, title), "\n", hint,
+        call. = FALSE
+    )
+}
+
+
+#' Format the Peak Filtering Summary as Text
+#'
+#' @param summary Data frame from \code{filterPeakChromosomes()}, with
+#'   rows for later steps added.
+#' @param title Character, heading line.
+#' @return A single string with an aligned table, for \code{message()}.
+#' @keywords internal
+formatFilterSummary <- function(summary, title = "Peak filtering summary") {
+    fmt_num <- function(x) {
+        ifelse(is.na(x), "-", formatC(x, format = "d", big.mark = ","))
+    }
+    details <- vapply(strsplit(summary$details, ", ", fixed = TRUE), function(d) {
+        if (length(d) == 0) "" else shortList(d)
+    }, character(1))
+
+    cols <- list(
+        Step = summary$step,
+        Removed = fmt_num(summary$removed),
+        Remaining = fmt_num(summary$remaining),
+        Details = details
+    )
+    widths <- vapply(names(cols), function(nm) {
+        max(nchar(c(nm, cols[[nm]])))
+    }, integer(1))
+    pad <- function(x, w, right) formatC(x, width = if (right) w else -w)
+    make_line <- function(vals) {
+        paste0(
+            "  ", pad(vals[1], widths[1], FALSE),
+            "  ", pad(vals[2], widths[2], TRUE),
+            "  ", pad(vals[3], widths[3], TRUE),
+            "  ", vals[4]
+        )
+    }
+    lines <- c(
+        title,
+        make_line(names(cols)),
+        vapply(seq_along(cols$Step), function(i) {
+            make_line(c(cols$Step[i], cols$Removed[i], cols$Remaining[i], cols$Details[i]))
+        }, character(1))
+    )
+    paste(sub("\\s+$", "", lines), collapse = "\n")
 }
 
 
@@ -614,8 +942,15 @@ reattachMetadata <- function(trimmed_gr, original_mcols, original_names) {
 getSequence <- function(granges_obj, genome_obj, extension = c(0, 0), min_length = 1, verbose = TRUE) {
     validateGetSequenceInputs(granges_obj, genome_obj, extension, min_length)
 
+    # Counts of removed ranges, stored in metadata(<result>)$filter_counts
+    counts <- c(too_short_after_extension = 0L, not_in_genome = 0L, too_short_at_chrom_end = 0L)
+    with_counts <- function(seqs) {
+        S4Vectors::metadata(seqs)$filter_counts <- counts
+        seqs
+    }
+
     if (length(granges_obj) == 0) {
-        return(Biostrings::DNAStringSet())
+        return(with_counts(Biostrings::DNAStringSet()))
     }
 
     original_mcols <- S4Vectors::mcols(granges_obj)
@@ -629,27 +964,35 @@ getSequence <- function(granges_obj, genome_obj, extension = c(0, 0), min_length
 
     valid_idx <- final_widths >= min_length
     num_removed_short <- sum(!valid_idx)
+    counts[["too_short_after_extension"]] <- num_removed_short
     if (num_removed_short > 0 && verbose) {
         message(num_removed_short, " ranges removed due to final length < ", min_length, " after extension/trimming.")
     }
 
     if (!any(valid_idx)) {
         if (verbose) message("No ranges remaining after filtering for minimum length.")
-        return(Biostrings::DNAStringSet())
+        return(with_counts(Biostrings::DNAStringSet()))
     }
 
     current_gr <- current_gr[valid_idx]
     IRanges::ranges(current_gr) <- IRanges::IRanges(start = coords$start[valid_idx], end = coords$end[valid_idx])
 
+    n_before_genome <- length(current_gr)
+    n_not_in_genome <- sum(!(as.character(GenomicRanges::seqnames(current_gr)) %in%
+        GenomeInfoDb::seqlevels(genome_obj)))
+    counts[["not_in_genome"]] <- n_not_in_genome
+
     trimmed_gr <- filterSeqlevelsAndTrim(current_gr, genome_obj, min_length, verbose)
     if (is.null(trimmed_gr)) {
-        return(Biostrings::DNAStringSet())
+        counts[["too_short_at_chrom_end"]] <- n_before_genome - n_not_in_genome
+        return(with_counts(Biostrings::DNAStringSet()))
     }
+    counts[["too_short_at_chrom_end"]] <- n_before_genome - n_not_in_genome - length(trimmed_gr)
 
     trimmed_gr <- reattachMetadata(trimmed_gr, original_mcols, original_names)
     sequences <- Biostrings::getSeq(genome_obj, trimmed_gr)
 
-    return(sequences)
+    return(with_counts(sequences))
 }
 
 
@@ -941,7 +1284,11 @@ generateBkgSetBatched <- function(peak_gr, genome_obj, min_seq_length,
     genome_sl <- genome_sl[!is.na(genome_sl)]
     common_sl <- intersect(names(genome_sl), GenomeInfoDb::seqlevels(shifted_gr))
     if (length(common_sl) > 0) {
-        GenomeInfoDb::seqlengths(shifted_gr)[common_sl] <- genome_sl[common_sl]
+        # Shifted ranges may run past chromosome ends; they are trimmed below,
+        # so the out-of-bound warning raised here is expected.
+        suppressWarnings(
+            GenomeInfoDb::seqlengths(shifted_gr)[common_sl] <- genome_sl[common_sl]
+        )
     }
 
     # Apply strand-aware extension to match peak sequence length

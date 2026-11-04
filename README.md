@@ -12,16 +12,6 @@
 
 ## Installation
 
-### From GitHub (Development)
-
-```r
-# Install pak if needed
-if (!requireNamespace("pak", quietly = TRUE))
-    install.packages("pak")
-
-pak::pkg_install("S00NYI/RBPSpecificity")
-```
-
 ### From Bioconductor
 
 ```r
@@ -30,6 +20,13 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 
 BiocManager::install("RBPSpecificity")
 ```
+
+## Planned Updates (see [devel branch](https://github.com/S00NYI/RBPSpecificity/tree/devel))
+
+- Support for any genome with a BSgenome package: pass a `BSgenome` object, or the name of any installed BSgenome build or package, to `motifEnrichment()`
+- Choice of chromosomes to analyze (`"standard"`, `"all"`, or a list of chromosome names)
+- Automatic matching of chromosome naming styles (e.g. `"1"` to `"chr1"`)
+- A summary table of how many peaks each filtering step removed
 
 ## Quick Start
 

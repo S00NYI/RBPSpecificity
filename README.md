@@ -12,24 +12,26 @@
 
 ## Installation
 
-### From GitHub (Development)
+This is the development branch. To install the released version, use Bioconductor (see the [main branch](https://github.com/S00NYI/RBPSpecificity)).
+
+### From GitHub (devel branch)
 
 ```r
 # Install pak if needed
 if (!requireNamespace("pak", quietly = TRUE))
     install.packages("pak")
 
-pak::pkg_install("S00NYI/RBPSpecificity")
+pak::pkg_install("S00NYI/RBPSpecificity@devel")
 ```
 
-### From Bioconductor
+## Updates
 
-```r
-if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager")
+New in the devel branch, not yet released on Bioconductor:
 
-BiocManager::install("RBPSpecificity")
-```
+- **Any genome with a BSgenome package**: `motifEnrichment()` accepts a `BSgenome` object, or the name of any installed BSgenome build (e.g. `"danRer11"`) or package (e.g. `"BSgenome.Drerio.UCSC.danRer11"`). The human and mouse shortcuts (`"hg38"`, `"mm39"`, ...) still work.
+- **Chromosome selection**: new `chromosomes` argument: `"standard"` (default), `"all"` (also keep scaffolds and unplaced contigs), or a vector of names such as `c("chr1", "chrX")`.
+- **Chromosome name matching**: peak chromosome names are matched to the genome's naming style (e.g. Ensembl `"1"`/`"MT"` to UCSC `"chr1"`/`"chrM"`), so these peaks are no longer dropped.
+- **Peak filtering summary**: a table of how many peaks each filtering step removed is printed and stored in `attr(result, "filter_summary")`.
 
 ## Quick Start
 

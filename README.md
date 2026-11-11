@@ -12,16 +12,22 @@
 
 ## Installation
 
-This is the development branch. To install the released version, use Bioconductor (see the [main branch](https://github.com/S00NYI/RBPSpecificity)).
-
-### From GitHub (devel branch)
+### From Bioconductor
 
 ```r
-# Install pak if needed
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("RBPSpecificity")
+```
+
+### From GitHub
+
+```r
 if (!requireNamespace("pak", quietly = TRUE))
     install.packages("pak")
 
-pak::pkg_install("S00NYI/RBPSpecificity@devel")
+pak::pak("S00NYI/RBPSpecificity@devel")
 ```
 
 ## Updates
@@ -61,6 +67,9 @@ plotSensitivity(enrichment)
 - **Specificity** - Quantify binding specificity from enrichment distributions
 - **Sensitivity** - Measure sensitivity to single nucleotide changes
 - **De novo enrichment** - Calculate k-mer enrichment directly from CLIP peaks
+- **Any genome with a BSgenome package** - Pass a `BSgenome` object or an installed build name (`species_or_build`)
+- **Chromosome selection** (`chromosomes`) - Standard chromosomes, all chromosomes, or a list of names, with automatic matching of naming styles
+- **Peak filtering summary** - Peaks removed at each step, stored in `attr(result, "filter_summary")`
 - **Visualization** - Distribution plots and sensitivity profiles
 
 ## Available Functions
@@ -146,9 +155,10 @@ See the [package vignette](vignettes/RBPSpecificity.Rmd) for detailed examples c
 2. De novo enrichment from CLIP peaks
 3. Multi-RBP comparison
 4. Visualization options
+5. Other genomes and chromosome selection
 
 For detailed usage, see **Figure_Scripts** folder in:
-https://github.com/S00NYI/BITS_Specificity
+https://github.com/S00NYI/BITS_Specificity (uses an earlier version, RBPSpecificity 0.99.0)
 
 ## Related Packages
 
@@ -165,11 +175,12 @@ If you use RBPSpecificity in your research, please cite:
 > *Inherent Specificity and Mutational Sensitivity as Quantitative Metrics for RBP Binding.* 
 > bioRxiv. https://www.biorxiv.org/content/10.1101/2025.03.28.646018v4
 
+\* The results in this manuscript were made with RBPSpecificity 0.99.0. Later versions renamed the main functions (now `returnSpecificity()` and `returnSensitivity()`), but give the same results.
+
 ## AI Usage Disclosure
 
-This package's Bioconductor review remediation, API refactoring, and test suite expansion were developed in collaboration with Google Antigravity. For the original R implementation of RBP specificity analysis, see Figure_Scripts folder in the [BITS_Specificity repository](https://github.com/S00NYI/BITS_Specificity).
-
-
+This package's Bioconductor review remediation, API refactoring, and test suite expansion were developed in collaboration with Google Antigravity. The genome and chromosome filtering updates in the devel branch were developed in collaboration with Claude Code.
+For the original R implementation of RBP specificity analysis, see Figure_Scripts folder in the [BITS_Specificity repository](https://github.com/S00NYI/BITS_Specificity).
 
 ## Further Reading
 
